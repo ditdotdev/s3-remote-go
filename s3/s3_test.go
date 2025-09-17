@@ -13,7 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/stretchr/testify/assert"
-	"github.com/titan-data/remote-sdk-go/remote"
+	"github.com/datadatdat/remote-sdk-go/remote"
 	"io/ioutil"
 	"os"
 	"strings"
