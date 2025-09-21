@@ -22,6 +22,8 @@ jobs:
       - uses: actions/setup-go@v4
         with:
           go-version: '1.22'
+      - name: Configure Git for private modules
+        run: git config --global url."https://${{ secrets.GO_MODULES_TOKEN }}@github.com/".insteadOf "https://github.com/"
       - name: Get Draft Release
         id: draft_release
         run: |
