@@ -5,18 +5,17 @@ package s3
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/aws/aws-sdk-go/service/s3/s3iface"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/datadatdat/remote-sdk-go/remote"
 	"io"
-	"io/ioutil"
 	"net/url"
 	"strings"
 )
@@ -143,10 +142,14 @@ func (s s3Remote) ToURL(properties map[string]interface{}) (string, map[string]s
 }
 
 // AWS SDK methods visible for testing
-var newSessionWithOptions = session.NewSessionWithOptions
-var newSession = session.NewSession
-var s3New = s3.New
-var mockS3 s3iface.S3API
+var newConfig = config.LoadDefaultConfig
+var newS3Client = s3.NewFromConfig
+var mockS3 S3ClientInterface
+
+// Interface to wrap S3 client for testing
+type S3ClientInterface interface {
+	GetObject(ctx context.Context, params *s3.GetObjectInput, optFns ...func(*s3.Options)) (*s3.GetObjectOutput, error)
+}
 
 func (s s3Remote) GetParameters(remoteProperties map[string]interface{}) (map[string]interface{}, error) {
 	result := map[string]interface{}{}
@@ -161,12 +164,12 @@ func (s s3Remote) GetParameters(remoteProperties map[string]interface{}) (map[st
 	}
 
 	if result["accessKey"] == nil || result["secretKey"] == nil || result["region"] == nil {
-		sess, err := newSessionWithOptions(session.Options{SharedConfigState: session.SharedConfigEnable})
+		cfg, err := newConfig(context.TODO())
 		if err != nil {
 			return nil, err
 		}
 
-		creds, err := sess.Config.Credentials.Get()
+		creds, err := cfg.Credentials.Retrieve(context.TODO())
 		if err != nil {
 			return nil, err
 		}
@@ -180,8 +183,8 @@ func (s s3Remote) GetParameters(remoteProperties map[string]interface{}) (map[st
 		if creds.SessionToken != "" {
 			result["sessionToken"] = creds.SessionToken
 		}
-		if result["region"] == nil && sess.Config.Region != nil {
-			result["region"] = *sess.Config.Region
+		if result["region"] == nil && cfg.Region != "" {
+			result["region"] = cfg.Region
 		}
 
 		if result["accessKey"] == nil || result["secretKey"] == nil {
@@ -247,7 +250,7 @@ func getRemoteValue(remote map[string]interface{}, parameters map[string]interfa
 /*
  * Get an instance of the S3 service based on the remote configuration and parameters.
  */
-func getS3(remote map[string]interface{}, parameters map[string]interface{}) (s3iface.S3API, error) {
+func getS3(remote map[string]interface{}, parameters map[string]interface{}) (S3ClientInterface, error) {
 	if mockS3 != nil {
 		return mockS3, nil
 	}
@@ -272,15 +275,15 @@ func getS3(remote map[string]interface{}, parameters map[string]interface{}) (s3
 		return nil, err
 	}
 
-	sess, err := newSession(&aws.Config{
-		Credentials: credentials.NewStaticCredentials(accessKey, secretKey, sessionToken),
-		Region:      aws.String(region),
-	})
+	cfg, err := newConfig(context.TODO(),
+		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(accessKey, secretKey, sessionToken)),
+		config.WithRegion(region),
+	)
 	if err != nil {
 		return nil, err
 	}
 
-	return s3New(sess), nil
+	return newS3Client(cfg), nil
 }
 
 /*
@@ -327,12 +330,11 @@ func getMetadataContent(remote map[string]interface{}, parameters map[string]int
 		Bucket: &bucket,
 		Key:    aws.String(getMetadataKey(key)),
 	}
-	res, err := svc.GetObject(&req)
+	res, err := svc.GetObject(context.TODO(), &req)
 	if err != nil {
-		if awsErr, ok := err.(awserr.Error); ok {
-			if awsErr.Code() == s3.ErrCodeNoSuchKey {
-				return ioutil.NopCloser(strings.NewReader("")), nil
-			}
+		var nsk *types.NoSuchKey
+		if errors.As(err, &nsk) {
+			return io.NopCloser(strings.NewReader("")), nil
 		}
 		return nil, err
 	}
@@ -389,23 +391,22 @@ func (s s3Remote) GetCommit(properties map[string]interface{}, parameters map[st
 		Bucket: &bucket,
 		Key:    key,
 	}
-	res, err := svc.GetObject(&req)
+	res, err := svc.GetObject(context.TODO(), &req)
 	if err != nil {
-		if awsErr, ok := err.(awserr.Error); ok {
-			if awsErr.Code() == s3.ErrCodeNoSuchKey {
-				return nil, nil
-			}
+		var nsk *types.NoSuchKey
+		if errors.As(err, &nsk) {
+			return nil, nil
 		}
 		return nil, err
 	}
 
 	metadata, ok := res.Metadata[metadataProperty]
-	if !ok || metadata == nil {
+	if !ok || metadata == "" {
 		return nil, nil
 	}
 
 	commit := MetadataCommit{}
-	err = json.Unmarshal([]byte(*metadata), &commit)
+	err = json.Unmarshal([]byte(metadata), &commit)
 	if err != nil {
 		return nil, nil
 	}
