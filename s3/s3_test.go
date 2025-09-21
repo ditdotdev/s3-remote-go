@@ -4,17 +4,17 @@
 package s3
 
 import (
+	"context"
 	"errors"
 	"fmt"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/aws/client"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/datadatdat/remote-sdk-go/remote"
-	"io/ioutil"
+	"io"
 	"os"
 	"strings"
 	"testing"
@@ -185,7 +185,7 @@ func TestGetParametersEnvironment(t *testing.T) {
 }
 
 func TestGetParametersFiles(t *testing.T) {
-	dir, err := ioutil.TempDir("", "s3.test")
+	dir, err := os.MkdirTemp("", "s3.test")
 	if !assert.NoError(t, err) {
 		return
 	}
@@ -210,8 +210,8 @@ aws_secret_access_key = SECRET2
 aws_session_token = TOKEN2
 `
 
-	err1 := ioutil.WriteFile(configFile, []byte(configContent), 0600)
-	err2 := ioutil.WriteFile(credFile, []byte(credContent), 0600)
+	err1 := os.WriteFile(configFile, []byte(configContent), 0600)
+	err2 := os.WriteFile(credFile, []byte(credContent), 0600)
 	if assert.NoError(t, err1) && assert.NoError(t, err2) {
 		_ = os.Setenv("AWS_CONFIG_FILE", configFile)
 		_ = os.Setenv("AWS_SHARED_CREDENTIALS_FILE", credFile)
@@ -229,63 +229,78 @@ aws_session_token = TOKEN2
 
 func TestBadNewSession(t *testing.T) {
 	r := remote.Get("s3")
-	newSessionWithOptions = func(options session.Options) (session *session.Session, err error) {
-		return nil, errors.New("err")
+	
+	// For AWS SDK v2, we need to mock the config loading
+	originalNewConfig := newConfig
+	newConfig = func(ctx context.Context, optFns ...func(*config.LoadOptions) error) (aws.Config, error) {
+		return aws.Config{}, errors.New("config load error")
 	}
+	defer func() {
+		newConfig = originalNewConfig
+	}()
+	
 	_, err := r.GetParameters(map[string]interface{}{"bucket": "bucket", "path": "path"})
 	assert.Error(t, err)
-	newSessionWithOptions = session.NewSessionWithOptions
 }
 
 func TestBadConfigCredentials(t *testing.T) {
 	r := remote.Get("s3")
 	p := new(MockProvider)
-	p.On("Retrieve").Return(credentials.Value{}, errors.New("err"))
-	newSessionWithOptions = func(options session.Options) (*session.Session, error) {
-		return &session.Session{
-			Config: &aws.Config{
-				Credentials: credentials.NewCredentials(p),
-			},
+	p.On("Retrieve", mock.Anything).Return(aws.Credentials{}, errors.New("err"))
+	
+	originalNewConfig := newConfig
+	newConfig = func(ctx context.Context, optFns ...func(*config.LoadOptions) error) (aws.Config, error) {
+		return aws.Config{
+			Credentials: aws.CredentialsProviderFunc(p.Retrieve),
 		}, nil
 	}
+	defer func() {
+		newConfig = originalNewConfig
+	}()
+	
 	_, err := r.GetParameters(map[string]interface{}{"bucket": "bucket", "path": "path"})
 	assert.Error(t, err)
-	newSessionWithOptions = session.NewSessionWithOptions
 }
 
 func TestBadCredentialsAccessKey(t *testing.T) {
 	r := remote.Get("s3")
 	p := new(MockProvider)
-	p.On("Retrieve").Return(credentials.Value{}, nil)
-	newSessionWithOptions = func(options session.Options) (*session.Session, error) {
-		return &session.Session{
-			Config: &aws.Config{
-				Credentials: credentials.NewCredentials(p),
-			},
+	p.On("Retrieve", mock.Anything).Return(aws.Credentials{}, nil)
+	
+	originalNewConfig := newConfig
+	newConfig = func(ctx context.Context, optFns ...func(*config.LoadOptions) error) (aws.Config, error) {
+		return aws.Config{
+			Credentials: aws.CredentialsProviderFunc(p.Retrieve),
 		}, nil
 	}
+	defer func() {
+		newConfig = originalNewConfig
+	}()
+	
 	_, err := r.GetParameters(map[string]interface{}{"bucket": "bucket", "path": "path"})
 	assert.Error(t, err)
-	newSessionWithOptions = session.NewSessionWithOptions
 }
 
 func TestBadCredentialsRegion(t *testing.T) {
 	r := remote.Get("s3")
 	p := new(MockProvider)
-	p.On("Retrieve").Return(credentials.Value{
+	p.On("Retrieve", mock.Anything).Return(aws.Credentials{
 		AccessKeyID:     "ACCESS",
 		SecretAccessKey: "SECRET",
 	}, nil)
-	newSessionWithOptions = func(options session.Options) (*session.Session, error) {
-		return &session.Session{
-			Config: &aws.Config{
-				Credentials: credentials.NewCredentials(p),
-			},
+	
+	originalNewConfig := newConfig
+	newConfig = func(ctx context.Context, optFns ...func(*config.LoadOptions) error) (aws.Config, error) {
+		return aws.Config{
+			Credentials: aws.CredentialsProviderFunc(p.Retrieve),
 		}, nil
 	}
+	defer func() {
+		newConfig = originalNewConfig
+	}()
+	
 	_, err := r.GetParameters(map[string]interface{}{"bucket": "bucket", "path": "path"})
 	assert.Error(t, err)
-	newSessionWithOptions = session.NewSessionWithOptions
 }
 
 func TestMetadataKey(t *testing.T) {
@@ -374,36 +389,39 @@ func TestValidateParametersInvalid(t *testing.T) {
 	assert.Error(t, err)
 }
 
-var mockConfig *aws.Config
+var mockConfig aws.Config
 
 func installMockS3() {
-	newSession = func(cfgs ...*aws.Config) (*session.Session, error) {
-		mockConfig = cfgs[0]
-		return &session.Session{
-			Config: mockConfig,
-		}, nil
+	newConfig = func(ctx context.Context, optFns ...func(*config.LoadOptions) error) (aws.Config, error) {
+		return mockConfig, nil
 	}
-	s3New = func(p client.ConfigProvider, cfgs ...*aws.Config) *s3.S3 {
-		return &s3.S3{
-			Client: &client.Client{
-				Config: *mockConfig,
-			},
-		}
+	newS3Client = func(cfg aws.Config, optFns ...func(*s3.Options)) *s3.Client {
+		return &s3.Client{}
 	}
 }
 
 func restoreS3() {
-	newSession = session.NewSession
-	s3New = s3.New
+	newConfig = config.LoadDefaultConfig
+	newS3Client = s3.NewFromConfig
 }
 
 func TestGetS3(t *testing.T) {
 	installMockS3()
+	mockConfig = aws.Config{
+		Region: "region",
+		Credentials: aws.CredentialsProviderFunc(func(ctx context.Context) (aws.Credentials, error) {
+			return aws.Credentials{
+				AccessKeyID:     "access",
+				SecretAccessKey: "secret",
+			}, nil
+		}),
+	}
+	
 	_, err := getS3(map[string]interface{}{"accessKey": "access", "secretKey": "secret", "region": "region"},
 		map[string]interface{}{})
 	if assert.NoError(t, err) {
-		assert.Equal(t, "region", *mockConfig.Region)
-		creds, err := mockConfig.Credentials.Get()
+		assert.Equal(t, "region", mockConfig.Region)
+		creds, err := mockConfig.Credentials.Retrieve(context.Background())
 		if assert.NoError(t, err) {
 			assert.Equal(t, "access", creds.AccessKeyID)
 			assert.Equal(t, "secret", creds.SecretAccessKey)
@@ -414,11 +432,22 @@ func TestGetS3(t *testing.T) {
 
 func TestGetS3Parameters(t *testing.T) {
 	installMockS3()
+	mockConfig = aws.Config{
+		Region: "region",
+		Credentials: aws.CredentialsProviderFunc(func(ctx context.Context) (aws.Credentials, error) {
+			return aws.Credentials{
+				AccessKeyID:     "access",
+				SecretAccessKey: "secret",
+				SessionToken:    "token",
+			}, nil
+		}),
+	}
+	
 	_, err := getS3(map[string]interface{}{"bucket": "bucket"},
 		map[string]interface{}{"accessKey": "access", "secretKey": "secret", "region": "region", "sessionToken": "token"})
 	if assert.NoError(t, err) {
-		assert.Equal(t, "region", *mockConfig.Region)
-		creds, err := mockConfig.Credentials.Get()
+		assert.Equal(t, "region", mockConfig.Region)
+		creds, err := mockConfig.Credentials.Retrieve(context.Background())
 		if assert.NoError(t, err) {
 			assert.Equal(t, "access", creds.AccessKeyID)
 			assert.Equal(t, "secret", creds.SecretAccessKey)
@@ -468,14 +497,18 @@ func TestGetS3BadRemote(t *testing.T) {
 	restoreS3()
 }
 
-func TestNewSessionFails(t *testing.T) {
-	newSession = func(cfgs ...*aws.Config) (*session.Session, error) {
-		return nil, errors.New("error")
+func TestNewConfigFails(t *testing.T) {
+	originalNewConfig := newConfig
+	newConfig = func(ctx context.Context, optFns ...func(*config.LoadOptions) error) (aws.Config, error) {
+		return aws.Config{}, errors.New("config error")
 	}
+	defer func() {
+		newConfig = originalNewConfig
+	}()
+	
 	_, err := getS3(map[string]interface{}{"accessKey": "access", "secretKey": "secret", "region": "region"},
 		map[string]interface{}{})
 	assert.Error(t, err)
-	newSession = session.NewSession
 }
 
 func TestInstallMock(t *testing.T) {
@@ -488,12 +521,12 @@ func TestInstallMock(t *testing.T) {
 func TestGetMetadataContent(t *testing.T) {
 	mockS3 = &MockS3{
 		GetObjectOutput: s3.GetObjectOutput{
-			Body: ioutil.NopCloser(strings.NewReader("metadata")),
+			Body: io.NopCloser(strings.NewReader("metadata")),
 		},
 	}
 	res, err := getMetadataContent(map[string]interface{}{"bucket": "bucket", "path": "path"}, map[string]interface{}{})
 	if assert.NoError(t, err) {
-		content, err := ioutil.ReadAll(res)
+		content, err := io.ReadAll(res)
 		if assert.NoError(t, err) {
 			assert.Equal(t, "metadata", string(content))
 		}
@@ -512,11 +545,11 @@ func TestGetMetadataGetS3Error(t *testing.T) {
 
 func TestGetMetadataMissing(t *testing.T) {
 	mockS3 = &MockS3{
-		err: awserr.New(s3.ErrCodeNoSuchKey, "error", nil),
+		err: &types.NoSuchKey{},
 	}
 	res, err := getMetadataContent(map[string]interface{}{"bucket": "bucket", "path": "path"}, map[string]interface{}{})
 	if assert.NoError(t, err) {
-		content, err := ioutil.ReadAll(res)
+		content, err := io.ReadAll(res)
 		if assert.NoError(t, err) {
 			assert.Equal(t, "", string(content))
 		}
@@ -527,7 +560,7 @@ func TestGetMetadataMissing(t *testing.T) {
 
 func TestGetMetadataOtherError(t *testing.T) {
 	mockS3 = &MockS3{
-		err: awserr.New(s3.ErrCodeNoSuchBucket, "error", nil),
+		err: &types.NoSuchBucket{},
 	}
 	_, err := getMetadataContent(map[string]interface{}{"bucket": "bucket", "path": "path"}, map[string]interface{}{})
 	assert.Error(t, err)
@@ -540,7 +573,7 @@ func TestListCommits(t *testing.T) {
 {"id": "two", "properties": {"timestamp": "2019-09-20T13:45:37Z"}}`
 	mockS3 = &MockS3{
 		GetObjectOutput: s3.GetObjectOutput{
-			Body: ioutil.NopCloser(strings.NewReader(metadata)),
+			Body: io.NopCloser(strings.NewReader(metadata)),
 		},
 	}
 	r := remote.Get("s3")
@@ -560,7 +593,7 @@ foo
 {"id": "two", "properties": {"timestamp": "2019-09-20T13:45:37Z"}}`
 	mockS3 = &MockS3{
 		GetObjectOutput: s3.GetObjectOutput{
-			Body: ioutil.NopCloser(strings.NewReader(metadata)),
+			Body: io.NopCloser(strings.NewReader(metadata)),
 		},
 	}
 	r := remote.Get("s3")
@@ -579,7 +612,7 @@ func TestListCommitsTags(t *testing.T) {
 {"id": "two", "properties": {"timestamp": "2019-09-20T13:45:37Z", "tags": { "c": "d" }}}`
 	mockS3 = &MockS3{
 		GetObjectOutput: s3.GetObjectOutput{
-			Body: ioutil.NopCloser(strings.NewReader(metadata)),
+			Body: io.NopCloser(strings.NewReader(metadata)),
 		},
 	}
 	r := remote.Get("s3")
@@ -611,7 +644,7 @@ func TestGetCommitBadS3(t *testing.T) {
 
 func TestGetCommitMissing(t *testing.T) {
 	mockS3 = &MockS3{
-		err: awserr.New(s3.ErrCodeNoSuchKey, "error", nil),
+		err: &types.NoSuchKey{},
 	}
 	r := remote.Get("s3")
 	commit, err := r.GetCommit(map[string]interface{}{"bucket": "bucket", "path": "path"}, map[string]interface{}{}, "id")
@@ -623,7 +656,7 @@ func TestGetCommitMissing(t *testing.T) {
 
 func TestGetCommitOtherError(t *testing.T) {
 	mockS3 = &MockS3{
-		err: awserr.New(s3.ErrCodeNoSuchBucket, "error", nil),
+		err: &types.NoSuchBucket{},
 	}
 	r := remote.Get("s3")
 	_, err := r.GetCommit(map[string]interface{}{"bucket": "bucket", "path": "path"}, map[string]interface{}{}, "id")
@@ -634,7 +667,7 @@ func TestGetCommitOtherError(t *testing.T) {
 func TestGetCommitMissingMetadata(t *testing.T) {
 	mockS3 = &MockS3{
 		GetObjectOutput: s3.GetObjectOutput{
-			Metadata: map[string]*string{},
+			Metadata: map[string]string{},
 		},
 	}
 	r := remote.Get("s3")
@@ -648,7 +681,7 @@ func TestGetCommitMissingMetadata(t *testing.T) {
 func TestGetCommitBadJson(t *testing.T) {
 	mockS3 = &MockS3{
 		GetObjectOutput: s3.GetObjectOutput{
-			Metadata: map[string]*string{"io.titan-data": aws.String("notjson")},
+			Metadata: map[string]string{"io.titan-data": "notjson"},
 		},
 	}
 	r := remote.Get("s3")
@@ -662,9 +695,9 @@ func TestGetCommitBadJson(t *testing.T) {
 func TestGetCommit(t *testing.T) {
 	mockS3 = &MockS3{
 		GetObjectOutput: s3.GetObjectOutput{
-			Metadata: map[string]*string{"io.titan-data": aws.String(`
+			Metadata: map[string]string{"io.titan-data": `
 {"id": "two", "properties": {"timestamp": "2019-09-20T13:45:37Z", "tags": { "c": "d" }}}
-`)},
+`},
 		},
 	}
 	r := remote.Get("s3")
