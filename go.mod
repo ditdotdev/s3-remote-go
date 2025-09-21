@@ -7,5 +7,3 @@ require (
 )
 
 go 1.13
-
-replace github.com/datadatdat/remote-sdk-go v0.2.4 => ../remote-sdk-go
