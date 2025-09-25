@@ -9,15 +9,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/url"
+	"strings"
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/datadatdat/remote-sdk-go/remote"
-	"io"
-	"net/url"
-	"strings"
 )
 
 /*
@@ -55,8 +56,7 @@ import (
  * from the user's environment at the time the operation request is made.
  */
 
-type s3Remote struct {
-}
+type s3Remote struct{}
 
 const metadataProperty = "io.titan-data"
 
@@ -142,9 +142,11 @@ func (s s3Remote) ToURL(properties map[string]interface{}) (string, map[string]s
 }
 
 // AWS SDK methods visible for testing
-var newConfig = config.LoadDefaultConfig
-var newS3Client = s3.NewFromConfig
-var mockS3 S3ClientInterface
+var (
+	newConfig   = config.LoadDefaultConfig
+	newS3Client = s3.NewFromConfig
+	mockS3      S3ClientInterface
+)
 
 // Interface to wrap S3 client for testing
 type S3ClientInterface interface {
