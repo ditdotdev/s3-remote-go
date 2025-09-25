@@ -1,6 +1,8 @@
 /*
  * Copyright The Titan Project Contributors.
  */
+
+// Package s3 provides AWS S3 remote backend functionality for Titan data storage.
 package s3
 
 import (
@@ -58,19 +60,25 @@ import (
 
 type s3Remote struct{}
 
-const metadataProperty = "io.titan-data"
+const (
 
+	metadataProperty = "io.titan-data"
+
+	s3Scheme         = "s3"
+)
+
+// Type returns the type identifier for this remote.
 func (s s3Remote) Type() (string, error) {
-	return "s3", nil
+	return s3Scheme, nil
 }
 
-func (s s3Remote) FromURL(rawUrl string, additionalProperties map[string]string) (map[string]interface{}, error) {
-	u, err := url.Parse(rawUrl)
+func (s s3Remote) FromURL(rawURL string, additionalProperties map[string]string) (map[string]interface{}, error) {
+	u, err := url.Parse(rawURL)
 	if err != nil {
 		return nil, err
 	}
 
-	if u.Scheme != "s3" {
+	if u.Scheme != s3Scheme {
 		return nil, errors.New("invalid remote scheme")
 	}
 
@@ -87,7 +95,9 @@ func (s s3Remote) FromURL(rawUrl string, additionalProperties map[string]string)
 	}
 
 	accessKey := additionalProperties["accessKey"]
+
 	secretKey := additionalProperties["secretKey"]
+
 	region := additionalProperties["region"]
 	for k := range additionalProperties {
 		if k != "accessKey" && k != "secretKey" && k != "region" {
@@ -100,20 +110,25 @@ func (s s3Remote) FromURL(rawUrl string, additionalProperties map[string]string)
 	}
 
 	path := u.Path
+
 	if strings.Index(path, "/") == 0 {
 		path = path[1:]
 	}
 
 	result := map[string]interface{}{"bucket": u.Hostname()}
+
 	if accessKey != "" {
 		result["accessKey"] = accessKey
 	}
+
 	if secretKey != "" {
 		result["secretKey"] = secretKey
 	}
+
 	if region != "" {
 		result["region"] = region
 	}
+
 	if path != "" {
 		result["path"] = path
 	}
@@ -121,21 +136,32 @@ func (s s3Remote) FromURL(rawUrl string, additionalProperties map[string]string)
 	return result, nil
 }
 
+// ToURL converts remote properties to a URL representation.
 func (s s3Remote) ToURL(properties map[string]interface{}) (string, map[string]string, error) {
 	u := fmt.Sprintf("s3://%s", properties["bucket"])
+
 	if properties["path"] != nil {
 		u += fmt.Sprintf("/%s", properties["path"])
 	}
 
 	params := map[string]string{}
+
 	if properties["accessKey"] != nil {
-		params["accessKey"] = properties["accessKey"].(string)
+		if accessKey, ok := properties["accessKey"].(string); ok {
+			params["accessKey"] = accessKey
+		}
 	}
+
 	if properties["secretKey"] != nil {
-		params["secretKey"] = properties["secretKey"].(string)
+		if secretKey, ok := properties["secretKey"].(string); ok {
+			params["secretKey"] = secretKey
+		}
 	}
+
 	if properties["region"] != nil {
-		params["region"] = properties["region"].(string)
+		if region, ok := properties["region"].(string); ok {
+			params["region"] = region
+		}
 	}
 
 	return u, params, nil
@@ -143,26 +169,37 @@ func (s s3Remote) ToURL(properties map[string]interface{}) (string, map[string]s
 
 // AWS SDK methods visible for testing
 var (
+
 	newConfig   = config.LoadDefaultConfig
+
 	newS3Client = s3.NewFromConfig
-	mockS3      S3ClientInterface
+	mockS3      ClientInterface
 )
 
-// Interface to wrap S3 client for testing
-type S3ClientInterface interface {
-	GetObject(ctx context.Context, params *s3.GetObjectInput, optFns ...func(*s3.Options)) (*s3.GetObjectOutput, error)
+// ClientInterface wraps S3 client operations for testing.
+type ClientInterface interface {
+	GetObject(ctx context.Context, params *s3.GetObjectInput, _ ...func(*s3.Options)) (*s3.GetObjectOutput, error)
 }
 
 func (s s3Remote) GetParameters(remoteProperties map[string]interface{}) (map[string]interface{}, error) {
 	result := map[string]interface{}{}
+
 	if remoteProperties["accessKey"] != nil {
-		result["accessKey"] = remoteProperties["accessKey"].(string)
+		if accessKey, ok := remoteProperties["accessKey"].(string); ok {
+			result["accessKey"] = accessKey
+		}
 	}
+
 	if remoteProperties["secretKey"] != nil {
-		result["secretKey"] = remoteProperties["secretKey"].(string)
+		if secretKey, ok := remoteProperties["secretKey"].(string); ok {
+			result["secretKey"] = secretKey
+		}
 	}
+
 	if remoteProperties["region"] != nil {
-		result["region"] = remoteProperties["region"].(string)
+		if region, ok := remoteProperties["region"].(string); ok {
+			result["region"] = region
+		}
 	}
 
 	if result["accessKey"] == nil || result["secretKey"] == nil || result["region"] == nil {
@@ -179,12 +216,15 @@ func (s s3Remote) GetParameters(remoteProperties map[string]interface{}) (map[st
 		if result["accessKey"] == nil && creds.AccessKeyID != "" {
 			result["accessKey"] = creds.AccessKeyID
 		}
+
 		if result["secretKey"] == nil && creds.SecretAccessKey != "" {
 			result["secretKey"] = creds.SecretAccessKey
 		}
+
 		if creds.SessionToken != "" {
 			result["sessionToken"] = creds.SessionToken
 		}
+
 		if result["region"] == nil && cfg.Region != "" {
 			result["region"] = cfg.Region
 		}
@@ -192,6 +232,7 @@ func (s s3Remote) GetParameters(remoteProperties map[string]interface{}) (map[st
 		if result["accessKey"] == nil || result["secretKey"] == nil {
 			return nil, errors.New("unable to determine AWS credentials")
 		}
+
 		if result["region"] == nil {
 			return nil, errors.New("unable to determine AWS region")
 		}
@@ -200,10 +241,9 @@ func (s s3Remote) GetParameters(remoteProperties map[string]interface{}) (map[st
 	return result, nil
 }
 
-/*
- * Validate a S3 remote. The only required field is "bucket". Optional fields include (path, accessKey,
- * secretKey, region). If either accessKey or secretKey is specified, then both must be specified.
- */
+// ValidateRemote validates S3 remote properties. The only required field is "bucket".
+// Optional fields include (path, accessKey, secretKey, region). If either accessKey
+// or secretKey is specified, then both must be specified.
 func (s s3Remote) ValidateRemote(properties map[string]interface{}) error {
 	err := remote.ValidateFields(properties, []string{"bucket"}, []string{"path", "accessKey", "secretKey", "region"})
 	if err != nil {
@@ -212,6 +252,7 @@ func (s s3Remote) ValidateRemote(properties map[string]interface{}) error {
 
 	_, hasAccess := properties["accessKey"]
 	_, hasSecret := properties["secretKey"]
+
 	if (hasAccess && !hasSecret) || (!hasAccess && hasSecret) {
 		return fmt.Errorf("either both of accessKey and secretKey must be set, or neither")
 	}
@@ -219,9 +260,8 @@ func (s s3Remote) ValidateRemote(properties map[string]interface{}) error {
 	return nil
 }
 
-/*
- * Validate S3 parameters. All parameters are optional: (accessKey, secretKey, region, sessionToken).
- */
+// ValidateParameters validates S3 parameters. All parameters are optional:
+// (accessKey, secretKey, region, sessionToken).
 func (s s3Remote) ValidateParameters(parameters map[string]interface{}) error {
 	return remote.ValidateFields(parameters, []string{}, []string{"accessKey", "secretKey", "region", "sessionToken"})
 }
@@ -230,9 +270,9 @@ func getRemoteValue(remote map[string]interface{}, parameters map[string]interfa
 	if raw, ok := parameters[field]; ok {
 		if value, ok := raw.(string); ok {
 			return value, nil
-		} else {
-			return "", fmt.Errorf("invalid parameter, '%s' must be a string", field)
 		}
+
+		return "", fmt.Errorf("invalid parameter, '%s' must be a string", field)
 	}
 
 	if remote == nil {
@@ -242,17 +282,18 @@ func getRemoteValue(remote map[string]interface{}, parameters map[string]interfa
 	if raw, ok := remote[field]; ok {
 		if value, ok := raw.(string); ok {
 			return value, nil
-		} else {
-			return "", fmt.Errorf("invalid parameter, '%s' must be a string", field)
 		}
+
+		return "", fmt.Errorf("invalid parameter, '%s' must be a string", field)
 	}
+
 	return "", fmt.Errorf("missing parameter '%s'", field)
 }
 
 /*
  * Get an instance of the S3 service based on the remote configuration and parameters.
  */
-func getS3(remote map[string]interface{}, parameters map[string]interface{}) (S3ClientInterface, error) {
+func getS3(remote map[string]interface{}, parameters map[string]interface{}) (ClientInterface, error) {
 	if mockS3 != nil {
 		return mockS3, nil
 	}
@@ -292,15 +333,23 @@ func getS3(remote map[string]interface{}, parameters map[string]interface{}) (S3
  * This function will return the key that identifies the given commit (or root key if no commit
  * is specified). This takes into the account the optional path configured in the remote. Public for testing.
  */
-func getKey(remote map[string]interface{}, commitId *string) *string {
+func getKey(remote map[string]interface{}, commitID *string) *string {
 	if _, ok := remote["path"]; !ok {
-		return commitId
+		return commitID
 	}
-	path := remote["path"].(string)
-	if commitId == nil {
+
+	path, ok := remote["path"].(string)
+
+	if !ok {
+		return commitID
+	}
+
+	if commitID == nil {
 		return &path
 	}
-	res := fmt.Sprintf("%s/%s", path, *commitId)
+
+	res := fmt.Sprintf("%s/%s", path, *commitID)
+
 	return &res
 }
 
@@ -311,9 +360,9 @@ func getKey(remote map[string]interface{}, commitId *string) *string {
 func getMetadataKey(path *string) string {
 	if path == nil {
 		return "titan"
-	} else {
-		return fmt.Sprintf("%s/titan", *path)
 	}
+
+	return fmt.Sprintf("%s/titan", *path)
 }
 
 /*
@@ -325,35 +374,43 @@ func getMetadataContent(remote map[string]interface{}, parameters map[string]int
 	if err != nil {
 		return nil, err
 	}
+
 	key := getKey(remote, nil)
-	bucket := remote["bucket"].(string)
+	bucket, ok := remote["bucket"].(string)
+
+	if !ok {
+		return nil, fmt.Errorf("bucket must be a string")
+	}
 
 	req := s3.GetObjectInput{
 		Bucket: &bucket,
 		Key:    aws.String(getMetadataKey(key)),
 	}
+
 	res, err := svc.GetObject(context.TODO(), &req)
 	if err != nil {
 		var nsk *types.NoSuchKey
 		if errors.As(err, &nsk) {
 			return io.NopCloser(strings.NewReader("")), nil
 		}
+
 		return nil, err
 	}
+
 	return res.Body, nil
 }
 
+// MetadataCommit represents a commit structure in the metadata file.
 type MetadataCommit struct {
-	Id         string                 `json:"id"`
+	ID string                 `json:"id"`
 	Properties map[string]interface{} `json:"properties"`
 }
 
-/*
- * List all commits in a repository. This operates by processing the metadata file at the root of the S3 path. Each
- * line is a JSON object with an "id" field and "properties" field.
- */
+// ListCommits lists all commits in a repository. This operates by processing the metadata file
+// at the root of the S3 path. Each line is a JSON object with an "id" field and "properties" field.
 func (s s3Remote) ListCommits(properties map[string]interface{}, parameters map[string]interface{}, tags []remote.Tag) ([]remote.Commit, error) {
 	var ret []remote.Commit
+
 	metadata, err := getMetadataContent(properties, parameters)
 	if err != nil {
 		return nil, err
@@ -364,9 +421,10 @@ func (s s3Remote) ListCommits(properties map[string]interface{}, parameters map[
 		line := strings.TrimSpace(scanner.Text())
 		if (line) != "" {
 			commit := MetadataCommit{}
+
 			err = json.Unmarshal([]byte(line), &commit)
-			if err == nil && commit.Properties != nil && commit.Id != "" && remote.MatchTags(commit.Properties, tags) {
-				ret = append(ret, remote.Commit{Id: commit.Id, Properties: commit.Properties})
+			if err == nil && commit.Properties != nil && commit.ID != "" && remote.MatchTags(commit.Properties, tags) {
+				ret = append(ret, remote.Commit{Id: commit.ID, Properties: commit.Properties})
 			}
 		}
 	}
@@ -376,44 +434,52 @@ func (s s3Remote) ListCommits(properties map[string]interface{}, parameters map[
 	return ret, nil
 }
 
-/*
- * Get the metadata for a single commit. This is stored as a user property on the object with the key
- * "io.titan-data". For historical reasons, we keep the metadata within the "properties" sub-object. This
- * matches how it's stored in the top-level metadata file.
- */
-func (s s3Remote) GetCommit(properties map[string]interface{}, parameters map[string]interface{}, commitId string) (*remote.Commit, error) {
+// GetCommit gets the metadata for a single commit. This is stored as a user property on the object
+// with the key "io.titan-data". For historical reasons, we keep the metadata within the "properties"
+// sub-object. This matches how it's stored in the top-level metadata file.
+func (s s3Remote) GetCommit(properties map[string]interface{}, parameters map[string]interface{}, commitID string) (*remote.Commit, error) {
 	svc, err := getS3(properties, parameters)
 	if err != nil {
 		return nil, err
 	}
-	key := getKey(properties, &commitId)
-	bucket := properties["bucket"].(string)
+
+	key := getKey(properties, &commitID)
+	bucket, ok := properties["bucket"].(string)
+
+	if !ok {
+		return nil, fmt.Errorf("bucket must be a string")
+	}
 
 	req := s3.GetObjectInput{
 		Bucket: &bucket,
 		Key:    key,
 	}
+
 	res, err := svc.GetObject(context.TODO(), &req)
 	if err != nil {
 		var nsk *types.NoSuchKey
 		if errors.As(err, &nsk) {
 			return nil, nil
 		}
+
 		return nil, err
 	}
 
 	metadata, ok := res.Metadata[metadataProperty]
+
 	if !ok || metadata == "" {
 		return nil, nil
 	}
 
 	commit := MetadataCommit{}
+
 	err = json.Unmarshal([]byte(metadata), &commit)
 	if err != nil {
 		return nil, nil
 	}
 
-	nativeCommit := remote.Commit{Id: commit.Id, Properties: commit.Properties}
+	nativeCommit := remote.Commit{Id: commit.ID, Properties: commit.Properties}
+
 	return &nativeCommit, nil
 }
 
