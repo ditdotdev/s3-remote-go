@@ -11,9 +11,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/datadatdat/remote-sdk-go/remote"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/datadatdat/remote-sdk-go/remote"
 	"io"
 	"os"
 	"strings"
@@ -229,7 +229,7 @@ aws_session_token = TOKEN2
 
 func TestBadNewSession(t *testing.T) {
 	r := remote.Get("s3")
-	
+
 	// For AWS SDK v2, we need to mock the config loading
 	originalNewConfig := newConfig
 	newConfig = func(ctx context.Context, optFns ...func(*config.LoadOptions) error) (aws.Config, error) {
@@ -238,7 +238,7 @@ func TestBadNewSession(t *testing.T) {
 	defer func() {
 		newConfig = originalNewConfig
 	}()
-	
+
 	_, err := r.GetParameters(map[string]interface{}{"bucket": "bucket", "path": "path"})
 	assert.Error(t, err)
 }
@@ -247,7 +247,7 @@ func TestBadConfigCredentials(t *testing.T) {
 	r := remote.Get("s3")
 	p := new(MockProvider)
 	p.On("Retrieve", mock.Anything).Return(aws.Credentials{}, errors.New("err"))
-	
+
 	originalNewConfig := newConfig
 	newConfig = func(ctx context.Context, optFns ...func(*config.LoadOptions) error) (aws.Config, error) {
 		return aws.Config{
@@ -257,7 +257,7 @@ func TestBadConfigCredentials(t *testing.T) {
 	defer func() {
 		newConfig = originalNewConfig
 	}()
-	
+
 	_, err := r.GetParameters(map[string]interface{}{"bucket": "bucket", "path": "path"})
 	assert.Error(t, err)
 }
@@ -266,7 +266,7 @@ func TestBadCredentialsAccessKey(t *testing.T) {
 	r := remote.Get("s3")
 	p := new(MockProvider)
 	p.On("Retrieve", mock.Anything).Return(aws.Credentials{}, nil)
-	
+
 	originalNewConfig := newConfig
 	newConfig = func(ctx context.Context, optFns ...func(*config.LoadOptions) error) (aws.Config, error) {
 		return aws.Config{
@@ -276,7 +276,7 @@ func TestBadCredentialsAccessKey(t *testing.T) {
 	defer func() {
 		newConfig = originalNewConfig
 	}()
-	
+
 	_, err := r.GetParameters(map[string]interface{}{"bucket": "bucket", "path": "path"})
 	assert.Error(t, err)
 }
@@ -288,7 +288,7 @@ func TestBadCredentialsRegion(t *testing.T) {
 		AccessKeyID:     "ACCESS",
 		SecretAccessKey: "SECRET",
 	}, nil)
-	
+
 	originalNewConfig := newConfig
 	newConfig = func(ctx context.Context, optFns ...func(*config.LoadOptions) error) (aws.Config, error) {
 		return aws.Config{
@@ -298,7 +298,7 @@ func TestBadCredentialsRegion(t *testing.T) {
 	defer func() {
 		newConfig = originalNewConfig
 	}()
-	
+
 	_, err := r.GetParameters(map[string]interface{}{"bucket": "bucket", "path": "path"})
 	assert.Error(t, err)
 }
@@ -416,7 +416,7 @@ func TestGetS3(t *testing.T) {
 			}, nil
 		}),
 	}
-	
+
 	_, err := getS3(map[string]interface{}{"accessKey": "access", "secretKey": "secret", "region": "region"},
 		map[string]interface{}{})
 	if assert.NoError(t, err) {
@@ -442,7 +442,7 @@ func TestGetS3Parameters(t *testing.T) {
 			}, nil
 		}),
 	}
-	
+
 	_, err := getS3(map[string]interface{}{"bucket": "bucket"},
 		map[string]interface{}{"accessKey": "access", "secretKey": "secret", "region": "region", "sessionToken": "token"})
 	if assert.NoError(t, err) {
@@ -505,7 +505,7 @@ func TestNewConfigFails(t *testing.T) {
 	defer func() {
 		newConfig = originalNewConfig
 	}()
-	
+
 	_, err := getS3(map[string]interface{}{"accessKey": "access", "secretKey": "secret", "region": "region"},
 		map[string]interface{}{})
 	assert.Error(t, err)
