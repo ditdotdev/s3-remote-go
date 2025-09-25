@@ -7,6 +7,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"os"
+	"strings"
+	"testing"
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -14,10 +19,6 @@ import (
 	"github.com/datadatdat/remote-sdk-go/remote"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"io"
-	"os"
-	"strings"
-	"testing"
 )
 
 func TestRegistered(t *testing.T) {
@@ -137,8 +138,10 @@ func TestToURL(t *testing.T) {
 
 func TestWithKeys(t *testing.T) {
 	r := remote.Get("s3")
-	u, props, err := r.ToURL(map[string]interface{}{"bucket": "bucket", "path": "path",
-		"accessKey": "ACCESS", "secretKey": "SECRET"})
+	u, props, err := r.ToURL(map[string]interface{}{
+		"bucket": "bucket", "path": "path",
+		"accessKey": "ACCESS", "secretKey": "SECRET",
+	})
 	if assert.NoError(t, err) {
 		assert.Equal(t, "s3://bucket/path", u)
 		assert.Len(t, props, 2)
@@ -149,8 +152,10 @@ func TestWithKeys(t *testing.T) {
 
 func TestWithRegsion(t *testing.T) {
 	r := remote.Get("s3")
-	u, props, err := r.ToURL(map[string]interface{}{"bucket": "bucket", "path": "path",
-		"region": "REGION"})
+	u, props, err := r.ToURL(map[string]interface{}{
+		"bucket": "bucket", "path": "path",
+		"region": "REGION",
+	})
 	if assert.NoError(t, err) {
 		assert.Equal(t, "s3://bucket/path", u)
 		assert.Len(t, props, 1)
@@ -160,8 +165,10 @@ func TestWithRegsion(t *testing.T) {
 
 func TestGetParameters(t *testing.T) {
 	r := remote.Get("s3")
-	props, err := r.GetParameters(map[string]interface{}{"bucket": "bucket", "path": "path",
-		"accessKey": "ACCESS", "secretKey": "SECRET", "region": "REGION"})
+	props, err := r.GetParameters(map[string]interface{}{
+		"bucket": "bucket", "path": "path",
+		"accessKey": "ACCESS", "secretKey": "SECRET", "region": "REGION",
+	})
 	if assert.NoError(t, err) {
 		assert.Equal(t, "ACCESS", props["accessKey"])
 		assert.Equal(t, "SECRET", props["secretKey"])
@@ -210,8 +217,8 @@ aws_secret_access_key = SECRET2
 aws_session_token = TOKEN2
 `
 
-	err1 := os.WriteFile(configFile, []byte(configContent), 0600)
-	err2 := os.WriteFile(credFile, []byte(credContent), 0600)
+	err1 := os.WriteFile(configFile, []byte(configContent), 0o600)
+	err2 := os.WriteFile(credFile, []byte(credContent), 0o600)
 	if assert.NoError(t, err1) && assert.NoError(t, err2) {
 		_ = os.Setenv("AWS_CONFIG_FILE", configFile)
 		_ = os.Setenv("AWS_SHARED_CREDENTIALS_FILE", credFile)
@@ -335,8 +342,10 @@ func TestKeyPathNoCommit(t *testing.T) {
 
 func TestValidateRemoteAllProperties(t *testing.T) {
 	r := remote.Get("s3")
-	err := r.ValidateRemote(map[string]interface{}{"bucket": "bucket", "secretKey": "secret",
-		"accessKey": "access", "path": "/path", "region": "region"})
+	err := r.ValidateRemote(map[string]interface{}{
+		"bucket": "bucket", "secretKey": "secret",
+		"accessKey": "access", "path": "/path", "region": "region",
+	})
 	assert.NoError(t, err)
 }
 
@@ -378,8 +387,10 @@ func TestValidateParametersEmpty(t *testing.T) {
 
 func TestValidateParametersAll(t *testing.T) {
 	r := remote.Get("s3")
-	err := r.ValidateParameters(map[string]interface{}{"accessKey": "access", "secretKey": "secret",
-		"region": "region", "sessionToken": "token"})
+	err := r.ValidateParameters(map[string]interface{}{
+		"accessKey": "access", "secretKey": "secret",
+		"region": "region", "sessionToken": "token",
+	})
 	assert.NoError(t, err)
 }
 
@@ -695,7 +706,8 @@ func TestGetCommitBadJson(t *testing.T) {
 func TestGetCommit(t *testing.T) {
 	mockS3 = &MockS3{
 		GetObjectOutput: s3.GetObjectOutput{
-			Metadata: map[string]string{"io.titan-data": `
+			Metadata: map[string]string{
+				"io.titan-data": `
 {"id": "two", "properties": {"timestamp": "2019-09-20T13:45:37Z", "tags": { "c": "d" }}}
 `},
 		},
