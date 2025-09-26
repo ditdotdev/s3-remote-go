@@ -5,6 +5,7 @@ package s3
 
 import (
 	"context"
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/stretchr/testify/mock"
@@ -25,7 +26,7 @@ type MockS3 struct {
 	s3.GetObjectOutput
 }
 
-func (m *MockS3) GetObject(ctx context.Context, in *s3.GetObjectInput, optFns ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
+func (m *MockS3) GetObject(_ context.Context, in *s3.GetObjectInput, _ ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
 	m.GetObjectInput = in
 	return &m.GetObjectOutput, m.err
 }
