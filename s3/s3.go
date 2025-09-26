@@ -61,10 +61,9 @@ import (
 type s3Remote struct{}
 
 const (
-
 	metadataProperty = "io.titan-data"
 
-	s3Scheme         = "s3"
+	s3Scheme = "s3"
 )
 
 // Type returns the type identifier for this remote.
@@ -169,8 +168,7 @@ func (s s3Remote) ToURL(properties map[string]interface{}) (string, map[string]s
 
 // AWS SDK methods visible for testing
 var (
-
-	newConfig   = config.LoadDefaultConfig
+	newConfig = config.LoadDefaultConfig
 
 	newS3Client = s3.NewFromConfig
 	mockS3      ClientInterface
@@ -402,7 +400,7 @@ func getMetadataContent(remote map[string]interface{}, parameters map[string]int
 
 // MetadataCommit represents a commit structure in the metadata file.
 type MetadataCommit struct {
-	ID string                 `json:"id"`
+	ID         string                 `json:"id"`
 	Properties map[string]interface{} `json:"properties"`
 }
 
