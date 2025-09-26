@@ -452,7 +452,7 @@ func installMockS3() {
 		return mockConfig, nil
 	}
 
-	        newS3Client = func(_ aws.Config, _ ...func(*s3.Options)) *s3.Client {
+	newS3Client = func(_ aws.Config, _ ...func(*s3.Options)) *s3.Client {
 		return &s3.Client{}
 	}
 }
