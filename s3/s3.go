@@ -422,7 +422,7 @@ func (s s3Remote) ListCommits(properties map[string]interface{}, parameters map[
 
 			err = json.Unmarshal([]byte(line), &commit)
 			if err == nil && commit.Properties != nil && commit.ID != "" && remote.MatchTags(commit.Properties, tags) {
-				ret = append(ret, remote.Commit{Id: commit.ID, Properties: commit.Properties})
+				ret = append(ret, remote.Commit{ID: commit.ID, Properties: commit.Properties})
 			}
 		}
 	}
@@ -476,7 +476,7 @@ func (s s3Remote) GetCommit(properties map[string]interface{}, parameters map[st
 		return nil, nil
 	}
 
-	nativeCommit := remote.Commit{Id: commit.ID, Properties: commit.Properties}
+	nativeCommit := remote.Commit{ID: commit.ID, Properties: commit.Properties}
 
 	return &nativeCommit, nil
 }
