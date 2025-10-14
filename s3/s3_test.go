@@ -1,5 +1,5 @@
 /*
- * Copyright The Titan Project Contributors.
+ * Copyright Datadatdat.
  */
 package s3
 
@@ -348,12 +348,12 @@ func TestBadCredentialsRegion(t *testing.T) {
 
 func TestMetadataKey(t *testing.T) {
 	k := getMetadataKey(aws.String("foo"))
-	assert.Equal(t, "foo/titan", k)
+	assert.Equal(t, "foo/datadatdat", k)
 }
 
 func TestMetadataKeyNil(t *testing.T) {
 	k := getMetadataKey(nil)
-	assert.Equal(t, "titan", k)
+	assert.Equal(t, "datadatdat", k)
 }
 
 func TestKeyNoPath(t *testing.T) {
@@ -780,7 +780,7 @@ func TestGetCommitMissingMetadata(t *testing.T) {
 func TestGetCommitBadJson(t *testing.T) {
 	mockS3 = &MockS3{
 		GetObjectOutput: s3.GetObjectOutput{
-			Metadata: map[string]string{"io.titan-data": "notjson"},
+			Metadata: map[string]string{"com.datadatdat": "notjson"},
 		},
 	}
 
@@ -798,7 +798,7 @@ func TestGetCommit(t *testing.T) {
 	mockS3 = &MockS3{
 		GetObjectOutput: s3.GetObjectOutput{
 			Metadata: map[string]string{
-				"io.titan-data": `
+				"com.datadatdat": `
 {"id": "two", "properties": {"timestamp": "2019-09-20T13:45:37Z", "tags": { "c": "d" }}}
 `,
 			},

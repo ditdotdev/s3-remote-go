@@ -1,8 +1,8 @@
 /*
- * Copyright The Titan Project Contributors.
+ * Copyright Datadatdat.
  */
 
-// Package s3 provides AWS S3 remote backend functionality for Titan data storage.
+// Package s3 provides AWS S3 remote backend functionality for Datadatdat data storage.
 package s3
 
 import (
@@ -30,7 +30,7 @@ import (
  *      s3://bucket/path/to/repo/3583-4053-598ea-298fa
  *
  * Within each commit sub-directory, there is .tar.gz file for each volume. The metadata for each commit is stored
- * as metadata for the object, as well in a 'titan' file at the root of the repository, with once line per commit. We
+ * as metadata for the object, as well in a 'datadatdat' file at the root of the repository, with once line per commit. We
  * do this for a few reasons:
  *
  *      * Storing it in object metadata is inefficient, as there's no way to fetch the metadata of multiple objects
@@ -61,7 +61,7 @@ import (
 type s3Remote struct{}
 
 const (
-	metadataProperty = "io.titan-data"
+	metadataProperty = "com.datadatdat"
 
 	s3Scheme = "s3"
 )
@@ -352,15 +352,15 @@ func getKey(remote map[string]interface{}, commitID *string) *string {
 }
 
 /*
- * Gets the path to the titan repo metadata file, which is either in the root of the bucket (if the path is
+ * Gets the path to the datadatdat repo metadata file, which is either in the root of the bucket (if the path is
  * null) or within the path directory.
  */
 func getMetadataKey(path *string) string {
 	if path == nil {
-		return "titan"
+		return "datadatdat"
 	}
 
-	return fmt.Sprintf("%s/titan", *path)
+	return fmt.Sprintf("%s/datadatdat", *path)
 }
 
 /*
@@ -433,7 +433,7 @@ func (s s3Remote) ListCommits(properties map[string]interface{}, parameters map[
 }
 
 // GetCommit gets the metadata for a single commit. This is stored as a user property on the object
-// with the key "io.titan-data". For historical reasons, we keep the metadata within the "properties"
+// with the key "com.datadatdat". For historical reasons, we keep the metadata within the "properties"
 // sub-object. This matches how it's stored in the top-level metadata file.
 func (s s3Remote) GetCommit(properties map[string]interface{}, parameters map[string]interface{}, commitID string) (*remote.Commit, error) {
 	svc, err := getS3(properties, parameters)
