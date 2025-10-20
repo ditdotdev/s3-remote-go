@@ -2,7 +2,7 @@ module github.com/datadatdat/s3-remote-go
 
 go 1.25.1
 
-require github.com/datadatdat/remote-sdk-go v1.0.0
+require github.com/datadatdat/remote-sdk-go v1.1.0
 
 require (
 	github.com/fatih/color v1.15.0 // indirect
@@ -21,5 +21,3 @@ require (
 	google.golang.org/grpc v1.76.0 // indirect
 	google.golang.org/protobuf v1.36.6 // indirect
 )
-
-replace github.com/datadatdat/remote-sdk-go => ../remote-sdk-go
