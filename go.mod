@@ -21,3 +21,5 @@ require (
 	google.golang.org/grpc v1.76.0 // indirect
 	google.golang.org/protobuf v1.36.6 // indirect
 )
+
+replace github.com/datadatdat/remote-sdk-go => ../remote-sdk-go
