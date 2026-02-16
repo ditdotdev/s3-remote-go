@@ -376,6 +376,28 @@ func TestKeyPathNoCommit(t *testing.T) {
 	assert.Equal(t, "one/two", *k)
 }
 
+func TestKeyPathNotString(t *testing.T) {
+	k := getKey(map[string]interface{}{"path": 123}, aws.String("id"))
+	assert.Equal(t, "id", *k)
+}
+
+func TestGetMetadataBadBucket(t *testing.T) {
+	mockS3 = &MockS3{}
+	_, err := getMetadataContent(map[string]interface{}{"bucket": 123}, map[string]interface{}{})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "bucket must be a string")
+	mockS3 = nil
+}
+
+func TestGetCommitBadBucket(t *testing.T) {
+	mockS3 = &MockS3{}
+	r := remote.Get("s3")
+	_, err := r.GetCommit(map[string]interface{}{"bucket": 123}, map[string]interface{}{}, "id")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "bucket must be a string")
+	mockS3 = nil
+}
+
 func TestValidateRemoteAllProperties(t *testing.T) {
 	r := remote.Get("s3")
 
