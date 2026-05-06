@@ -64,6 +64,13 @@ const (
 	metadataProperty = "com.datadatdat"
 
 	s3Scheme = "s3"
+
+	propBucket       = "bucket"
+	propPath         = "path"
+	propAccessKey    = "accessKey"
+	propSecretKey    = "secretKey"
+	propRegion       = "region"
+	propSessionToken = "sessionToken"
 )
 
 // Type returns the type identifier for this remote.
@@ -93,13 +100,13 @@ func (s s3Remote) FromURL(rawURL string, additionalProperties map[string]string)
 		return nil, errors.New("missing remote bucket name")
 	}
 
-	accessKey := additionalProperties["accessKey"]
+	accessKey := additionalProperties[propAccessKey]
 
-	secretKey := additionalProperties["secretKey"]
+	secretKey := additionalProperties[propSecretKey]
 
-	region := additionalProperties["region"]
+	region := additionalProperties[propRegion]
 	for k := range additionalProperties {
-		if k != "accessKey" && k != "secretKey" && k != "region" {
+		if k != propAccessKey && k != propSecretKey && k != propRegion {
 			return nil, fmt.Errorf("invalid remote property '%s'", k)
 		}
 	}
@@ -114,22 +121,22 @@ func (s s3Remote) FromURL(rawURL string, additionalProperties map[string]string)
 		path = path[1:]
 	}
 
-	result := map[string]interface{}{"bucket": u.Hostname()}
+	result := map[string]interface{}{propBucket: u.Hostname()}
 
 	if accessKey != "" {
-		result["accessKey"] = accessKey
+		result[propAccessKey] = accessKey
 	}
 
 	if secretKey != "" {
-		result["secretKey"] = secretKey
+		result[propSecretKey] = secretKey
 	}
 
 	if region != "" {
-		result["region"] = region
+		result[propRegion] = region
 	}
 
 	if path != "" {
-		result["path"] = path
+		result[propPath] = path
 	}
 
 	return result, nil
@@ -137,29 +144,29 @@ func (s s3Remote) FromURL(rawURL string, additionalProperties map[string]string)
 
 // ToURL converts remote properties to a URL representation.
 func (s s3Remote) ToURL(properties map[string]interface{}) (string, map[string]string, error) {
-	u := fmt.Sprintf("s3://%s", properties["bucket"])
+	u := fmt.Sprintf("s3://%s", properties[propBucket])
 
-	if properties["path"] != nil {
-		u += fmt.Sprintf("/%s", properties["path"])
+	if properties[propPath] != nil {
+		u += fmt.Sprintf("/%s", properties[propPath])
 	}
 
 	params := map[string]string{}
 
-	if properties["accessKey"] != nil {
-		if accessKey, ok := properties["accessKey"].(string); ok {
-			params["accessKey"] = accessKey
+	if properties[propAccessKey] != nil {
+		if accessKey, ok := properties[propAccessKey].(string); ok {
+			params[propAccessKey] = accessKey
 		}
 	}
 
-	if properties["secretKey"] != nil {
-		if secretKey, ok := properties["secretKey"].(string); ok {
-			params["secretKey"] = secretKey
+	if properties[propSecretKey] != nil {
+		if secretKey, ok := properties[propSecretKey].(string); ok {
+			params[propSecretKey] = secretKey
 		}
 	}
 
-	if properties["region"] != nil {
-		if region, ok := properties["region"].(string); ok {
-			params["region"] = region
+	if properties[propRegion] != nil {
+		if region, ok := properties[propRegion].(string); ok {
+			params[propRegion] = region
 		}
 	}
 
@@ -182,25 +189,25 @@ type ClientInterface interface {
 func (s s3Remote) GetParameters(remoteProperties map[string]interface{}) (map[string]interface{}, error) {
 	result := map[string]interface{}{}
 
-	if remoteProperties["accessKey"] != nil {
-		if accessKey, ok := remoteProperties["accessKey"].(string); ok {
-			result["accessKey"] = accessKey
+	if remoteProperties[propAccessKey] != nil {
+		if accessKey, ok := remoteProperties[propAccessKey].(string); ok {
+			result[propAccessKey] = accessKey
 		}
 	}
 
-	if remoteProperties["secretKey"] != nil {
-		if secretKey, ok := remoteProperties["secretKey"].(string); ok {
-			result["secretKey"] = secretKey
+	if remoteProperties[propSecretKey] != nil {
+		if secretKey, ok := remoteProperties[propSecretKey].(string); ok {
+			result[propSecretKey] = secretKey
 		}
 	}
 
-	if remoteProperties["region"] != nil {
-		if region, ok := remoteProperties["region"].(string); ok {
-			result["region"] = region
+	if remoteProperties[propRegion] != nil {
+		if region, ok := remoteProperties[propRegion].(string); ok {
+			result[propRegion] = region
 		}
 	}
 
-	if result["accessKey"] == nil || result["secretKey"] == nil || result["region"] == nil {
+	if result[propAccessKey] == nil || result[propSecretKey] == nil || result[propRegion] == nil {
 		cfg, err := newConfig(context.TODO())
 		if err != nil {
 			return nil, err
@@ -211,27 +218,27 @@ func (s s3Remote) GetParameters(remoteProperties map[string]interface{}) (map[st
 			return nil, err
 		}
 
-		if result["accessKey"] == nil && creds.AccessKeyID != "" {
-			result["accessKey"] = creds.AccessKeyID
+		if result[propAccessKey] == nil && creds.AccessKeyID != "" {
+			result[propAccessKey] = creds.AccessKeyID
 		}
 
-		if result["secretKey"] == nil && creds.SecretAccessKey != "" {
-			result["secretKey"] = creds.SecretAccessKey
+		if result[propSecretKey] == nil && creds.SecretAccessKey != "" {
+			result[propSecretKey] = creds.SecretAccessKey
 		}
 
 		if creds.SessionToken != "" {
-			result["sessionToken"] = creds.SessionToken
+			result[propSessionToken] = creds.SessionToken
 		}
 
-		if result["region"] == nil && cfg.Region != "" {
-			result["region"] = cfg.Region
+		if result[propRegion] == nil && cfg.Region != "" {
+			result[propRegion] = cfg.Region
 		}
 
-		if result["accessKey"] == nil || result["secretKey"] == nil {
+		if result[propAccessKey] == nil || result[propSecretKey] == nil {
 			return nil, errors.New("unable to determine AWS credentials")
 		}
 
-		if result["region"] == nil {
+		if result[propRegion] == nil {
 			return nil, errors.New("unable to determine AWS region")
 		}
 	}
@@ -243,13 +250,13 @@ func (s s3Remote) GetParameters(remoteProperties map[string]interface{}) (map[st
 // Optional fields include (path, accessKey, secretKey, region). If either accessKey
 // or secretKey is specified, then both must be specified.
 func (s s3Remote) ValidateRemote(properties map[string]interface{}) error {
-	err := remote.ValidateFields(properties, []string{"bucket"}, []string{"path", "accessKey", "secretKey", "region"})
+	err := remote.ValidateFields(properties, []string{propBucket}, []string{propPath, propAccessKey, propSecretKey, propRegion})
 	if err != nil {
 		return err
 	}
 
-	_, hasAccess := properties["accessKey"]
-	_, hasSecret := properties["secretKey"]
+	_, hasAccess := properties[propAccessKey]
+	_, hasSecret := properties[propSecretKey]
 
 	if (hasAccess && !hasSecret) || (!hasAccess && hasSecret) {
 		return fmt.Errorf("either both of accessKey and secretKey must be set, or neither")
@@ -261,7 +268,7 @@ func (s s3Remote) ValidateRemote(properties map[string]interface{}) error {
 // ValidateParameters validates S3 parameters. All parameters are optional:
 // (accessKey, secretKey, region, sessionToken).
 func (s s3Remote) ValidateParameters(parameters map[string]interface{}) error {
-	return remote.ValidateFields(parameters, []string{}, []string{"accessKey", "secretKey", "region", "sessionToken"})
+	return remote.ValidateFields(parameters, []string{}, []string{propAccessKey, propSecretKey, propRegion, propSessionToken})
 }
 
 func getRemoteValue(remote map[string]interface{}, parameters map[string]interface{}, field string) (string, error) {
@@ -296,22 +303,22 @@ func getS3(remote map[string]interface{}, parameters map[string]interface{}) (Cl
 		return mockS3, nil
 	}
 
-	accessKey, err := getRemoteValue(remote, parameters, "accessKey")
+	accessKey, err := getRemoteValue(remote, parameters, propAccessKey)
 	if err != nil {
 		return nil, err
 	}
 
-	secretKey, err := getRemoteValue(remote, parameters, "secretKey")
+	secretKey, err := getRemoteValue(remote, parameters, propSecretKey)
 	if err != nil {
 		return nil, err
 	}
 
-	region, err := getRemoteValue(remote, parameters, "region")
+	region, err := getRemoteValue(remote, parameters, propRegion)
 	if err != nil {
 		return nil, err
 	}
 
-	sessionToken, err := getRemoteValue(nil, parameters, "sessionToken")
+	sessionToken, err := getRemoteValue(nil, parameters, propSessionToken)
 	if err != nil {
 		return nil, err
 	}
@@ -332,11 +339,11 @@ func getS3(remote map[string]interface{}, parameters map[string]interface{}) (Cl
  * is specified). This takes into the account the optional path configured in the remote. Public for testing.
  */
 func getKey(remote map[string]interface{}, commitID *string) *string {
-	if _, ok := remote["path"]; !ok {
+	if _, ok := remote[propPath]; !ok {
 		return commitID
 	}
 
-	path, ok := remote["path"].(string)
+	path, ok := remote[propPath].(string)
 
 	if !ok {
 		return commitID
@@ -374,7 +381,7 @@ func getMetadataContent(remote map[string]interface{}, parameters map[string]int
 	}
 
 	key := getKey(remote, nil)
-	bucket, ok := remote["bucket"].(string)
+	bucket, ok := remote[propBucket].(string)
 
 	if !ok {
 		return nil, fmt.Errorf("bucket must be a string")
@@ -442,7 +449,7 @@ func (s s3Remote) GetCommit(properties map[string]interface{}, parameters map[st
 	}
 
 	key := getKey(properties, &commitID)
-	bucket, ok := properties["bucket"].(string)
+	bucket, ok := properties[propBucket].(string)
 
 	if !ok {
 		return nil, fmt.Errorf("bucket must be a string")
