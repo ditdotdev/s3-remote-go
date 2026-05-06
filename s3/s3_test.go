@@ -21,6 +21,17 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+const (
+	testAccessUpper = "ACCESS"
+	testSecretUpper = "SECRET"
+	testRegionUpper = "REGION"
+	testAccessLower = "access"
+	testSecretLower = "secret"
+	testBar         = "bar"
+	testFoo         = "foo"
+	testToken       = "token"
+)
+
 func TestRegistered(t *testing.T) {
 	r := remote.Get("s3")
 	ret, err := r.Type()
@@ -35,11 +46,11 @@ func TestFromURL(t *testing.T) {
 	props, err := r.FromURL("s3://bucket/object/path", map[string]string{})
 
 	if assert.NoError(t, err) {
-		assert.Equal(t, "bucket", props["bucket"])
-		assert.Equal(t, "object/path", props["path"])
-		assert.Nil(t, props["accessKey"])
-		assert.Nil(t, props["secretKey"])
-		assert.Nil(t, props["region"])
+		assert.Equal(t, propBucket, props[propBucket])
+		assert.Equal(t, "object/path", props[propPath])
+		assert.Nil(t, props[propAccessKey])
+		assert.Nil(t, props[propSecretKey])
+		assert.Nil(t, props[propRegion])
 	}
 }
 
@@ -48,11 +59,11 @@ func TestNoPath(t *testing.T) {
 	props, err := r.FromURL("s3://bucket", map[string]string{})
 
 	if assert.NoError(t, err) {
-		assert.Equal(t, "bucket", props["bucket"])
-		assert.Nil(t, props["path"])
-		assert.Nil(t, props["accessKey"])
-		assert.Nil(t, props["secretKey"])
-		assert.Nil(t, props["region"])
+		assert.Equal(t, propBucket, props[propBucket])
+		assert.Nil(t, props[propPath])
+		assert.Nil(t, props[propAccessKey])
+		assert.Nil(t, props[propSecretKey])
+		assert.Nil(t, props[propRegion])
 	}
 }
 
@@ -76,7 +87,7 @@ func TestBadSchemeName(t *testing.T) {
 
 func TestBadProperty(t *testing.T) {
 	r := remote.Get("s3")
-	_, err := r.FromURL("s3://bucket/object/path", map[string]string{"foo": "bar"})
+	_, err := r.FromURL("s3://bucket/object/path", map[string]string{testFoo: testBar})
 	assert.Error(t, err)
 }
 
@@ -107,33 +118,33 @@ func TestBadMissingBucket(t *testing.T) {
 func TestProperties(t *testing.T) {
 	r := remote.Get("s3")
 	props, err := r.FromURL("s3://bucket/object/path", map[string]string{
-		"accessKey": "ACCESS", "secretKey": "SECRET", "region": "REGION",
+		propAccessKey: testAccessUpper, propSecretKey: testSecretUpper, propRegion: testRegionUpper,
 	})
 
 	if assert.NoError(t, err) {
-		assert.Equal(t, "bucket", props["bucket"])
-		assert.Equal(t, "object/path", props["path"])
-		assert.Equal(t, "ACCESS", props["accessKey"])
-		assert.Equal(t, "SECRET", props["secretKey"])
-		assert.Equal(t, "REGION", props["region"])
+		assert.Equal(t, propBucket, props[propBucket])
+		assert.Equal(t, "object/path", props[propPath])
+		assert.Equal(t, testAccessUpper, props[propAccessKey])
+		assert.Equal(t, testSecretUpper, props[propSecretKey])
+		assert.Equal(t, testRegionUpper, props[propRegion])
 	}
 }
 
 func TestBadAccessKeyOnly(t *testing.T) {
 	r := remote.Get("s3")
-	_, err := r.FromURL("s3://bucket/object/path", map[string]string{"accessKey": "ACCESS"})
+	_, err := r.FromURL("s3://bucket/object/path", map[string]string{propAccessKey: testAccessUpper})
 	assert.Error(t, err)
 }
 
 func TestBadSecretKeyOnly(t *testing.T) {
 	r := remote.Get("s3")
-	_, err := r.FromURL("s3://bucket/object/path", map[string]string{"secretKey": "ACCESS"})
+	_, err := r.FromURL("s3://bucket/object/path", map[string]string{propSecretKey: testAccessUpper})
 	assert.Error(t, err)
 }
 
 func TestToURL(t *testing.T) {
 	r := remote.Get("s3")
-	u, props, err := r.ToURL(map[string]interface{}{"bucket": "bucket", "path": "path"})
+	u, props, err := r.ToURL(map[string]interface{}{propBucket: propBucket, propPath: propPath})
 
 	if assert.NoError(t, err) {
 		assert.Equal(t, "s3://bucket/path", u)
@@ -144,63 +155,63 @@ func TestToURL(t *testing.T) {
 func TestWithKeys(t *testing.T) {
 	r := remote.Get("s3")
 	u, props, err := r.ToURL(map[string]interface{}{
-		"bucket": "bucket", "path": "path",
-		"accessKey": "ACCESS", "secretKey": "SECRET",
+		propBucket: propBucket, propPath: propPath,
+		propAccessKey: testAccessUpper, propSecretKey: testSecretUpper,
 	})
 
 	if assert.NoError(t, err) {
 		assert.Equal(t, "s3://bucket/path", u)
 		assert.Len(t, props, 2)
-		assert.Equal(t, "ACCESS", props["accessKey"])
-		assert.Equal(t, "SECRET", props["secretKey"])
+		assert.Equal(t, testAccessUpper, props[propAccessKey])
+		assert.Equal(t, testSecretUpper, props[propSecretKey])
 	}
 }
 
 func TestWithRegsion(t *testing.T) {
 	r := remote.Get("s3")
 	u, props, err := r.ToURL(map[string]interface{}{
-		"bucket": "bucket", "path": "path",
-		"region": "REGION",
+		propBucket: propBucket, propPath: propPath,
+		propRegion: testRegionUpper,
 	})
 
 	if assert.NoError(t, err) {
 		assert.Equal(t, "s3://bucket/path", u)
 		assert.Len(t, props, 1)
-		assert.Equal(t, "REGION", props["region"])
+		assert.Equal(t, testRegionUpper, props[propRegion])
 	}
 }
 
 func TestGetParameters(t *testing.T) {
 	r := remote.Get("s3")
 	props, err := r.GetParameters(map[string]interface{}{
-		"bucket": "bucket", "path": "path",
-		"accessKey": "ACCESS", "secretKey": "SECRET", "region": "REGION",
+		propBucket: propBucket, propPath: propPath,
+		propAccessKey: testAccessUpper, propSecretKey: testSecretUpper, propRegion: testRegionUpper,
 	})
 
 	if assert.NoError(t, err) {
-		assert.Equal(t, "ACCESS", props["accessKey"])
-		assert.Equal(t, "SECRET", props["secretKey"])
-		assert.Equal(t, "REGION", props["region"])
+		assert.Equal(t, testAccessUpper, props[propAccessKey])
+		assert.Equal(t, testSecretUpper, props[propSecretKey])
+		assert.Equal(t, testRegionUpper, props[propRegion])
 	}
 }
 
 func TestGetParametersEnvironment(t *testing.T) {
 	r := remote.Get("s3")
 
-	_ = os.Setenv("AWS_ACCESS_KEY_ID", "ACCESS")
+	_ = os.Setenv("AWS_ACCESS_KEY_ID", testAccessUpper)
 
-	_ = os.Setenv("AWS_SECRET_ACCESS_KEY", "SECRET")
+	_ = os.Setenv("AWS_SECRET_ACCESS_KEY", testSecretUpper)
 
 	_ = os.Setenv("AWS_REGION", "us-west-2")
 
 	_ = os.Setenv("AWS_SESSION_TOKEN", "TOKEN")
-	props, err := r.GetParameters(map[string]interface{}{"bucket": "bucket", "path": "path"})
+	props, err := r.GetParameters(map[string]interface{}{propBucket: propBucket, propPath: propPath})
 
 	if assert.NoError(t, err) {
-		assert.Equal(t, "ACCESS", props["accessKey"])
-		assert.Equal(t, "SECRET", props["secretKey"])
-		assert.Equal(t, "us-west-2", props["region"])
-		assert.Equal(t, "TOKEN", props["sessionToken"])
+		assert.Equal(t, testAccessUpper, props[propAccessKey])
+		assert.Equal(t, testSecretUpper, props[propSecretKey])
+		assert.Equal(t, "us-west-2", props[propRegion])
+		assert.Equal(t, "TOKEN", props[propSessionToken])
 	}
 }
 
@@ -248,12 +259,12 @@ aws_session_token = TOKEN2
 
 		r := remote.Get("s3")
 
-		props, err := r.GetParameters(map[string]interface{}{"bucket": "bucket", "path": "path"})
+		props, err := r.GetParameters(map[string]interface{}{propBucket: propBucket, propPath: propPath})
 		if assert.NoError(t, err) {
-			assert.Equal(t, "ACCESS2", props["accessKey"])
-			assert.Equal(t, "SECRET2", props["secretKey"])
-			assert.Equal(t, "us-west-1", props["region"])
-			assert.Equal(t, "TOKEN2", props["sessionToken"])
+			assert.Equal(t, "ACCESS2", props[propAccessKey])
+			assert.Equal(t, "SECRET2", props[propSecretKey])
+			assert.Equal(t, "us-west-1", props[propRegion])
+			assert.Equal(t, "TOKEN2", props[propSessionToken])
 		}
 	}
 }
@@ -273,7 +284,7 @@ func TestBadNewSession(t *testing.T) {
 		newConfig = originalNewConfig
 	}()
 
-	_, err := r.GetParameters(map[string]interface{}{"bucket": "bucket", "path": "path"})
+	_, err := r.GetParameters(map[string]interface{}{propBucket: propBucket, propPath: propPath})
 	assert.Error(t, err)
 }
 
@@ -295,7 +306,7 @@ func TestBadConfigCredentials(t *testing.T) {
 		newConfig = originalNewConfig
 	}()
 
-	_, err := r.GetParameters(map[string]interface{}{"bucket": "bucket", "path": "path"})
+	_, err := r.GetParameters(map[string]interface{}{propBucket: propBucket, propPath: propPath})
 	assert.Error(t, err)
 }
 
@@ -317,7 +328,7 @@ func TestBadCredentialsAccessKey(t *testing.T) {
 		newConfig = originalNewConfig
 	}()
 
-	_, err := r.GetParameters(map[string]interface{}{"bucket": "bucket", "path": "path"})
+	_, err := r.GetParameters(map[string]interface{}{propBucket: propBucket, propPath: propPath})
 	assert.Error(t, err)
 }
 
@@ -326,8 +337,8 @@ func TestBadCredentialsRegion(t *testing.T) {
 
 	p := new(MockProvider)
 	p.On("Retrieve", mock.Anything).Return(aws.Credentials{
-		AccessKeyID:     "ACCESS",
-		SecretAccessKey: "SECRET",
+		AccessKeyID:     testAccessUpper,
+		SecretAccessKey: testSecretUpper,
 	}, nil)
 
 	originalNewConfig := newConfig
@@ -342,12 +353,12 @@ func TestBadCredentialsRegion(t *testing.T) {
 		newConfig = originalNewConfig
 	}()
 
-	_, err := r.GetParameters(map[string]interface{}{"bucket": "bucket", "path": "path"})
+	_, err := r.GetParameters(map[string]interface{}{propBucket: propBucket, propPath: propPath})
 	assert.Error(t, err)
 }
 
 func TestMetadataKey(t *testing.T) {
-	k := getMetadataKey(aws.String("foo"))
+	k := getMetadataKey(aws.String(testFoo))
 	assert.Equal(t, "foo/datadatdat", k)
 }
 
@@ -367,23 +378,23 @@ func TestKeyNoPathNoCommit(t *testing.T) {
 }
 
 func TestKeyPath(t *testing.T) {
-	k := getKey(map[string]interface{}{"path": "one/two"}, aws.String("three"))
+	k := getKey(map[string]interface{}{propPath: "one/two"}, aws.String("three"))
 	assert.Equal(t, "one/two/three", *k)
 }
 
 func TestKeyPathNoCommit(t *testing.T) {
-	k := getKey(map[string]interface{}{"path": "one/two"}, nil)
+	k := getKey(map[string]interface{}{propPath: "one/two"}, nil)
 	assert.Equal(t, "one/two", *k)
 }
 
 func TestKeyPathNotString(t *testing.T) {
-	k := getKey(map[string]interface{}{"path": 123}, aws.String("id"))
+	k := getKey(map[string]interface{}{propPath: 123}, aws.String("id"))
 	assert.Equal(t, "id", *k)
 }
 
 func TestGetMetadataBadBucket(t *testing.T) {
 	mockS3 = &MockS3{}
-	_, err := getMetadataContent(map[string]interface{}{"bucket": 123}, map[string]interface{}{})
+	_, err := getMetadataContent(map[string]interface{}{propBucket: 123}, map[string]interface{}{})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "bucket must be a string")
 	mockS3 = nil
@@ -392,7 +403,7 @@ func TestGetMetadataBadBucket(t *testing.T) {
 func TestGetCommitBadBucket(t *testing.T) {
 	mockS3 = &MockS3{}
 	r := remote.Get("s3")
-	_, err := r.GetCommit(map[string]interface{}{"bucket": 123}, map[string]interface{}{}, "id")
+	_, err := r.GetCommit(map[string]interface{}{propBucket: 123}, map[string]interface{}{}, "id")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "bucket must be a string")
 	mockS3 = nil
@@ -402,8 +413,8 @@ func TestValidateRemoteAllProperties(t *testing.T) {
 	r := remote.Get("s3")
 
 	err := r.ValidateRemote(map[string]interface{}{
-		"bucket": "bucket", "secretKey": "secret",
-		"accessKey": "access", "path": "/path", "region": "region",
+		propBucket: propBucket, propSecretKey: testSecretLower,
+		propAccessKey: testAccessLower, propPath: "/path", propRegion: propRegion,
 	})
 	assert.NoError(t, err)
 }
@@ -411,7 +422,7 @@ func TestValidateRemoteAllProperties(t *testing.T) {
 func TestValidateRemoteOnlyRequired(t *testing.T) {
 	r := remote.Get("s3")
 
-	err := r.ValidateRemote(map[string]interface{}{"bucket": "bucket"})
+	err := r.ValidateRemote(map[string]interface{}{propBucket: propBucket})
 	assert.NoError(t, err)
 }
 
@@ -425,21 +436,21 @@ func TestValidateRemoteMissingRequired(t *testing.T) {
 func TestValidateRemoteInvalidPoperty(t *testing.T) {
 	r := remote.Get("s3")
 
-	err := r.ValidateRemote(map[string]interface{}{"bucket": "bucket", "foo": "bar"})
+	err := r.ValidateRemote(map[string]interface{}{propBucket: propBucket, testFoo: testBar})
 	assert.Error(t, err)
 }
 
 func TestValidateRemoteOnlyAccessKey(t *testing.T) {
 	r := remote.Get("s3")
 
-	err := r.ValidateRemote(map[string]interface{}{"bucket": "bucket", "accessKey": "access"})
+	err := r.ValidateRemote(map[string]interface{}{propBucket: propBucket, propAccessKey: testAccessLower})
 	assert.Error(t, err)
 }
 
 func TestValidateRemoteOnlySecretKey(t *testing.T) {
 	r := remote.Get("s3")
 
-	err := r.ValidateRemote(map[string]interface{}{"bucket": "bucket", "secretKey": "secret"})
+	err := r.ValidateRemote(map[string]interface{}{propBucket: propBucket, propSecretKey: testSecretLower})
 	assert.Error(t, err)
 }
 
@@ -454,8 +465,8 @@ func TestValidateParametersAll(t *testing.T) {
 	r := remote.Get("s3")
 
 	err := r.ValidateParameters(map[string]interface{}{
-		"accessKey": "access", "secretKey": "secret",
-		"region": "region", "sessionToken": "token",
+		propAccessKey: testAccessLower, propSecretKey: testSecretLower,
+		propRegion: propRegion, propSessionToken: testToken,
 	})
 	assert.NoError(t, err)
 }
@@ -463,7 +474,7 @@ func TestValidateParametersAll(t *testing.T) {
 func TestValidateParametersInvalid(t *testing.T) {
 	r := remote.Get("s3")
 
-	err := r.ValidateParameters(map[string]interface{}{"foo": "bar"})
+	err := r.ValidateParameters(map[string]interface{}{testFoo: testBar})
 	assert.Error(t, err)
 }
 
@@ -489,25 +500,25 @@ func TestGetS3(t *testing.T) {
 	installMockS3()
 
 	mockConfig = aws.Config{
-		Region: "region",
+		Region: propRegion,
 		Credentials: aws.CredentialsProviderFunc(func(_ context.Context) (aws.Credentials, error) {
 			return aws.Credentials{
-				AccessKeyID:     "access",
-				SecretAccessKey: "secret",
+				AccessKeyID:     testAccessLower,
+				SecretAccessKey: testSecretLower,
 			}, nil
 		}),
 	}
 
-	_, err := getS3(map[string]interface{}{"accessKey": "access", "secretKey": "secret", "region": "region"},
+	_, err := getS3(map[string]interface{}{propAccessKey: testAccessLower, propSecretKey: testSecretLower, propRegion: propRegion},
 		map[string]interface{}{})
 
 	if assert.NoError(t, err) {
-		assert.Equal(t, "region", mockConfig.Region)
+		assert.Equal(t, propRegion, mockConfig.Region)
 
 		creds, err := mockConfig.Credentials.Retrieve(context.Background())
 		if assert.NoError(t, err) {
-			assert.Equal(t, "access", creds.AccessKeyID)
-			assert.Equal(t, "secret", creds.SecretAccessKey)
+			assert.Equal(t, testAccessLower, creds.AccessKeyID)
+			assert.Equal(t, testSecretLower, creds.SecretAccessKey)
 		}
 	}
 
@@ -518,27 +529,27 @@ func TestGetS3Parameters(t *testing.T) {
 	installMockS3()
 
 	mockConfig = aws.Config{
-		Region: "region",
+		Region: propRegion,
 		Credentials: aws.CredentialsProviderFunc(func(_ context.Context) (aws.Credentials, error) {
 			return aws.Credentials{
-				AccessKeyID:     "access",
-				SecretAccessKey: "secret",
-				SessionToken:    "token",
+				AccessKeyID:     testAccessLower,
+				SecretAccessKey: testSecretLower,
+				SessionToken:    testToken,
 			}, nil
 		}),
 	}
 
-	_, err := getS3(map[string]interface{}{"bucket": "bucket"},
-		map[string]interface{}{"accessKey": "access", "secretKey": "secret", "region": "region", "sessionToken": "token"})
+	_, err := getS3(map[string]interface{}{propBucket: propBucket},
+		map[string]interface{}{propAccessKey: testAccessLower, propSecretKey: testSecretLower, propRegion: propRegion, propSessionToken: testToken})
 
 	if assert.NoError(t, err) {
-		assert.Equal(t, "region", mockConfig.Region)
+		assert.Equal(t, propRegion, mockConfig.Region)
 
 		creds, err := mockConfig.Credentials.Retrieve(context.Background())
 		if assert.NoError(t, err) {
-			assert.Equal(t, "access", creds.AccessKeyID)
-			assert.Equal(t, "secret", creds.SecretAccessKey)
-			assert.Equal(t, "token", creds.SessionToken)
+			assert.Equal(t, testAccessLower, creds.AccessKeyID)
+			assert.Equal(t, testSecretLower, creds.SecretAccessKey)
+			assert.Equal(t, testToken, creds.SessionToken)
 		}
 	}
 
@@ -548,8 +559,8 @@ func TestGetS3Parameters(t *testing.T) {
 func TestGetS3MissingRegion(t *testing.T) {
 	installMockS3()
 
-	_, err := getS3(map[string]interface{}{"bucket": "bucket"},
-		map[string]interface{}{"accessKey": "access", "secretKey": "secret"})
+	_, err := getS3(map[string]interface{}{propBucket: propBucket},
+		map[string]interface{}{propAccessKey: testAccessLower, propSecretKey: testSecretLower})
 	assert.Error(t, err)
 	restoreS3()
 }
@@ -557,8 +568,8 @@ func TestGetS3MissingRegion(t *testing.T) {
 func TestGetS3MissingAccessKey(t *testing.T) {
 	installMockS3()
 
-	_, err := getS3(map[string]interface{}{"bucket": "bucket"},
-		map[string]interface{}{"region": "region", "secretKey": "secret"})
+	_, err := getS3(map[string]interface{}{propBucket: propBucket},
+		map[string]interface{}{propRegion: propRegion, propSecretKey: testSecretLower})
 	assert.Error(t, err)
 	restoreS3()
 }
@@ -566,8 +577,8 @@ func TestGetS3MissingAccessKey(t *testing.T) {
 func TestGetS3MissingSecretKey(t *testing.T) {
 	installMockS3()
 
-	_, err := getS3(map[string]interface{}{"bucket": "bucket"},
-		map[string]interface{}{"region": "region", "accessKey": "access"})
+	_, err := getS3(map[string]interface{}{propBucket: propBucket},
+		map[string]interface{}{propRegion: propRegion, propAccessKey: testAccessLower})
 	assert.Error(t, err)
 	restoreS3()
 }
@@ -575,8 +586,8 @@ func TestGetS3MissingSecretKey(t *testing.T) {
 func TestGetS3BadToken(t *testing.T) {
 	installMockS3()
 
-	_, err := getS3(map[string]interface{}{"bucket": "bucket"},
-		map[string]interface{}{"accessKey": "access", "secretKey": "secret", "region": "region", "sessionToken": 4})
+	_, err := getS3(map[string]interface{}{propBucket: propBucket},
+		map[string]interface{}{propAccessKey: testAccessLower, propSecretKey: testSecretLower, propRegion: propRegion, propSessionToken: 4})
 	assert.Error(t, err)
 	restoreS3()
 }
@@ -584,8 +595,8 @@ func TestGetS3BadToken(t *testing.T) {
 func TestGetS3BadRemote(t *testing.T) {
 	installMockS3()
 
-	_, err := getS3(map[string]interface{}{"bucket": "bucket", "accessKey": 4},
-		map[string]interface{}{"secretKey": "secret", "region": "region"})
+	_, err := getS3(map[string]interface{}{propBucket: propBucket, propAccessKey: 4},
+		map[string]interface{}{propSecretKey: testSecretLower, propRegion: propRegion})
 	assert.Error(t, err)
 	restoreS3()
 }
@@ -601,7 +612,7 @@ func TestNewConfigFails(t *testing.T) {
 		newConfig = originalNewConfig
 	}()
 
-	_, err := getS3(map[string]interface{}{"accessKey": "access", "secretKey": "secret", "region": "region"},
+	_, err := getS3(map[string]interface{}{propAccessKey: testAccessLower, propSecretKey: testSecretLower, propRegion: propRegion},
 		map[string]interface{}{})
 	assert.Error(t, err)
 }
@@ -621,7 +632,7 @@ func TestGetMetadataContent(t *testing.T) {
 		},
 	}
 
-	res, err := getMetadataContent(map[string]interface{}{"bucket": "bucket", "path": "path"}, map[string]interface{}{})
+	res, err := getMetadataContent(map[string]interface{}{propBucket: propBucket, propPath: propPath}, map[string]interface{}{})
 
 	if assert.NoError(t, err) {
 		content, err := io.ReadAll(res)
@@ -636,7 +647,7 @@ func TestGetMetadataContent(t *testing.T) {
 func TestGetMetadataGetS3Error(t *testing.T) {
 	installMockS3()
 
-	_, err := getMetadataContent(map[string]interface{}{"bucket": "bucket", "path": "path"}, map[string]interface{}{})
+	_, err := getMetadataContent(map[string]interface{}{propBucket: propBucket, propPath: propPath}, map[string]interface{}{})
 	assert.Error(t, err)
 	restoreS3()
 }
@@ -645,7 +656,7 @@ func TestGetMetadataMissing(t *testing.T) {
 	mockS3 = &MockS3{
 		err: &types.NoSuchKey{},
 	}
-	res, err := getMetadataContent(map[string]interface{}{"bucket": "bucket", "path": "path"}, map[string]interface{}{})
+	res, err := getMetadataContent(map[string]interface{}{propBucket: propBucket, propPath: propPath}, map[string]interface{}{})
 
 	if assert.NoError(t, err) {
 		content, err := io.ReadAll(res)
@@ -661,7 +672,7 @@ func TestGetMetadataOtherError(t *testing.T) {
 	mockS3 = &MockS3{
 		err: &types.NoSuchBucket{},
 	}
-	_, err := getMetadataContent(map[string]interface{}{"bucket": "bucket", "path": "path"}, map[string]interface{}{})
+	_, err := getMetadataContent(map[string]interface{}{propBucket: propBucket, propPath: propPath}, map[string]interface{}{})
 	assert.Error(t, err)
 
 	mockS3 = nil
@@ -679,7 +690,7 @@ func TestListCommits(t *testing.T) {
 	}
 
 	r := remote.Get("s3")
-	commits, err := r.ListCommits(map[string]interface{}{"bucket": "bucket", "path": "path"}, map[string]interface{}{}, []remote.Tag{})
+	commits, err := r.ListCommits(map[string]interface{}{propBucket: propBucket, propPath: propPath}, map[string]interface{}{}, []remote.Tag{})
 
 	if assert.NoError(t, err) {
 		assert.Len(t, commits, 2)
@@ -702,7 +713,7 @@ foo
 	}
 
 	r := remote.Get("s3")
-	commits, err := r.ListCommits(map[string]interface{}{"bucket": "bucket", "path": "path"}, map[string]interface{}{}, []remote.Tag{})
+	commits, err := r.ListCommits(map[string]interface{}{propBucket: propBucket, propPath: propPath}, map[string]interface{}{}, []remote.Tag{})
 
 	if assert.NoError(t, err) {
 		assert.Len(t, commits, 1)
@@ -724,7 +735,7 @@ func TestListCommitsTags(t *testing.T) {
 	}
 
 	r := remote.Get("s3")
-	commits, err := r.ListCommits(map[string]interface{}{"bucket": "bucket", "path": "path"}, map[string]interface{}{}, []remote.Tag{{Key: "a"}})
+	commits, err := r.ListCommits(map[string]interface{}{propBucket: propBucket, propPath: propPath}, map[string]interface{}{}, []remote.Tag{{Key: "a"}})
 
 	if assert.NoError(t, err) {
 		assert.Len(t, commits, 1)
@@ -740,7 +751,7 @@ func TestListCommitsError(t *testing.T) {
 	}
 
 	r := remote.Get("s3")
-	_, err := r.ListCommits(map[string]interface{}{"bucket": "bucket", "path": "path"}, map[string]interface{}{}, []remote.Tag{{Key: "a"}})
+	_, err := r.ListCommits(map[string]interface{}{propBucket: propBucket, propPath: propPath}, map[string]interface{}{}, []remote.Tag{{Key: "a"}})
 	assert.Error(t, err)
 
 	mockS3 = nil
@@ -761,7 +772,7 @@ func TestGetCommitMissing(t *testing.T) {
 	}
 
 	r := remote.Get("s3")
-	commit, err := r.GetCommit(map[string]interface{}{"bucket": "bucket", "path": "path"}, map[string]interface{}{}, "id")
+	commit, err := r.GetCommit(map[string]interface{}{propBucket: propBucket, propPath: propPath}, map[string]interface{}{}, "id")
 
 	if assert.NoError(t, err) {
 		assert.Nil(t, commit)
@@ -776,7 +787,7 @@ func TestGetCommitOtherError(t *testing.T) {
 	}
 
 	r := remote.Get("s3")
-	_, err := r.GetCommit(map[string]interface{}{"bucket": "bucket", "path": "path"}, map[string]interface{}{}, "id")
+	_, err := r.GetCommit(map[string]interface{}{propBucket: propBucket, propPath: propPath}, map[string]interface{}{}, "id")
 	assert.Error(t, err)
 
 	mockS3 = nil
@@ -790,7 +801,7 @@ func TestGetCommitMissingMetadata(t *testing.T) {
 	}
 
 	r := remote.Get("s3")
-	commit, err := r.GetCommit(map[string]interface{}{"bucket": "bucket", "path": "path"}, map[string]interface{}{}, "id")
+	commit, err := r.GetCommit(map[string]interface{}{propBucket: propBucket, propPath: propPath}, map[string]interface{}{}, "id")
 
 	if assert.NoError(t, err) {
 		assert.Nil(t, commit)
@@ -807,7 +818,7 @@ func TestGetCommitBadJson(t *testing.T) {
 	}
 
 	r := remote.Get("s3")
-	commit, err := r.GetCommit(map[string]interface{}{"bucket": "bucket", "path": "path"}, map[string]interface{}{}, "id")
+	commit, err := r.GetCommit(map[string]interface{}{propBucket: propBucket, propPath: propPath}, map[string]interface{}{}, "id")
 
 	if assert.NoError(t, err) {
 		assert.Nil(t, commit)
@@ -828,7 +839,7 @@ func TestGetCommit(t *testing.T) {
 	}
 
 	r := remote.Get("s3")
-	commit, err := r.GetCommit(map[string]interface{}{"bucket": "bucket", "path": "path"}, map[string]interface{}{}, "id")
+	commit, err := r.GetCommit(map[string]interface{}{propBucket: propBucket, propPath: propPath}, map[string]interface{}{}, "id")
 
 	if assert.NoError(t, err) {
 		assert.Equal(t, "2019-09-20T13:45:37Z", commit.Properties["timestamp"])
