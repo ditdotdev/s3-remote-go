@@ -115,11 +115,7 @@ func (s s3Remote) FromURL(rawURL string, additionalProperties map[string]string)
 		return nil, fmt.Errorf("either both of accessKey and secretKey must be set, or neither")
 	}
 
-	path := u.Path
-
-	if strings.Index(path, "/") == 0 {
-		path = path[1:]
-	}
+	path := strings.TrimPrefix(u.Path, "/")
 
 	result := map[string]interface{}{propBucket: u.Hostname()}
 
@@ -208,12 +204,12 @@ func (s s3Remote) GetParameters(remoteProperties map[string]interface{}) (map[st
 	}
 
 	if result[propAccessKey] == nil || result[propSecretKey] == nil || result[propRegion] == nil {
-		cfg, err := newConfig(context.TODO())
+		cfg, err := newConfig(context.Background())
 		if err != nil {
 			return nil, err
 		}
 
-		creds, err := cfg.Credentials.Retrieve(context.TODO())
+		creds, err := cfg.Credentials.Retrieve(context.Background())
 		if err != nil {
 			return nil, err
 		}
@@ -323,7 +319,7 @@ func getS3(remote map[string]interface{}, parameters map[string]interface{}) (Cl
 		return nil, err
 	}
 
-	cfg, err := newConfig(context.TODO(),
+	cfg, err := newConfig(context.Background(),
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(accessKey, secretKey, sessionToken)),
 		config.WithRegion(region),
 	)
@@ -392,7 +388,7 @@ func getMetadataContent(remote map[string]interface{}, parameters map[string]int
 		Key:    aws.String(getMetadataKey(key)),
 	}
 
-	res, err := svc.GetObject(context.TODO(), &req)
+	res, err := svc.GetObject(context.Background(), &req)
 	if err != nil {
 		var nsk *types.NoSuchKey
 		if errors.As(err, &nsk) {
@@ -420,18 +416,29 @@ func (s s3Remote) ListCommits(properties map[string]interface{}, parameters map[
 	if err != nil {
 		return nil, err
 	}
+	defer func() { _ = metadata.Close() }()
 
 	scanner := bufio.NewScanner(metadata)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
-		if (line) != "" {
-			commit := MetadataCommit{}
-
-			err = json.Unmarshal([]byte(line), &commit)
-			if err == nil && commit.Properties != nil && commit.ID != "" && remote.MatchTags(commit.Properties, tags) {
-				ret = append(ret, remote.Commit{ID: commit.ID, Properties: commit.Properties})
-			}
+		if line == "" {
+			continue
 		}
+
+		commit := MetadataCommit{}
+		// Malformed JSON lines are intentionally skipped to keep ListCommits resilient
+		// to partial corruption of the metadata file. See TestListCommitsInvalid.
+		if err := json.Unmarshal([]byte(line), &commit); err != nil {
+			continue
+		}
+
+		if commit.Properties != nil && commit.ID != "" && remote.MatchTags(commit.Properties, tags) {
+			ret = append(ret, remote.Commit{ID: commit.ID, Properties: commit.Properties})
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("reading metadata: %w", err)
 	}
 
 	remote.SortCommits(ret)
@@ -460,7 +467,7 @@ func (s s3Remote) GetCommit(properties map[string]interface{}, parameters map[st
 		Key:    key,
 	}
 
-	res, err := svc.GetObject(context.TODO(), &req)
+	res, err := svc.GetObject(context.Background(), &req)
 	if err != nil {
 		var nsk *types.NoSuchKey
 		if errors.As(err, &nsk) {
