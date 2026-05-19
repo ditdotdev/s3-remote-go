@@ -167,7 +167,7 @@ func TestWithKeys(t *testing.T) {
 	}
 }
 
-func TestWithRegsion(t *testing.T) {
+func TestWithRegion(t *testing.T) {
 	r, _ := remote.Get("s3")
 	u, props, err := r.ToURL(map[string]interface{}{
 		propBucket: propBucket, propPath: propPath,
@@ -393,20 +393,18 @@ func TestKeyPathNotString(t *testing.T) {
 }
 
 func TestGetMetadataBadBucket(t *testing.T) {
-	mockS3 = &MockS3{}
+	setMockS3(t, &MockS3{})
 	_, err := getMetadataContent(map[string]interface{}{propBucket: 123}, map[string]interface{}{})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "bucket must be a string")
-	mockS3 = nil
 }
 
 func TestGetCommitBadBucket(t *testing.T) {
-	mockS3 = &MockS3{}
+	setMockS3(t, &MockS3{})
 	r, _ := remote.Get("s3")
 	_, err := r.GetCommit(map[string]interface{}{propBucket: 123}, map[string]interface{}{}, "id")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "bucket must be a string")
-	mockS3 = nil
 }
 
 func TestValidateRemoteAllProperties(t *testing.T) {
@@ -480,7 +478,25 @@ func TestValidateParametersInvalid(t *testing.T) {
 
 var mockConfig aws.Config
 
-func installMockS3() {
+// setMockS3 installs a mock S3 client and registers cleanup so the global is
+// always reset, even when an assertion fails mid-test. This prevents state from
+// leaking into subsequent tests.
+func setMockS3(t *testing.T, m ClientInterface) {
+	t.Helper()
+
+	mockS3 = m
+
+	t.Cleanup(func() { mockS3 = nil })
+}
+
+// installMockS3 installs mock implementations of newConfig and newS3Client and
+// registers cleanup so the globals are always restored.
+func installMockS3(t *testing.T) {
+	t.Helper()
+
+	origConfig := newConfig
+	origClient := newS3Client
+
 	newConfig = func(_ context.Context, _ ...func(*config.LoadOptions) error) (aws.Config, error) {
 		return mockConfig, nil
 	}
@@ -488,16 +504,15 @@ func installMockS3() {
 	newS3Client = func(_ aws.Config, _ ...func(*s3.Options)) *s3.Client {
 		return &s3.Client{}
 	}
-}
 
-func restoreS3() {
-	newConfig = config.LoadDefaultConfig
-
-	newS3Client = s3.NewFromConfig
+	t.Cleanup(func() {
+		newConfig = origConfig
+		newS3Client = origClient
+	})
 }
 
 func TestGetS3(t *testing.T) {
-	installMockS3()
+	installMockS3(t)
 
 	mockConfig = aws.Config{
 		Region: propRegion,
@@ -521,12 +536,10 @@ func TestGetS3(t *testing.T) {
 			assert.Equal(t, testSecretLower, creds.SecretAccessKey)
 		}
 	}
-
-	restoreS3()
 }
 
 func TestGetS3Parameters(t *testing.T) {
-	installMockS3()
+	installMockS3(t)
 
 	mockConfig = aws.Config{
 		Region: propRegion,
@@ -552,53 +565,46 @@ func TestGetS3Parameters(t *testing.T) {
 			assert.Equal(t, testToken, creds.SessionToken)
 		}
 	}
-
-	restoreS3()
 }
 
 func TestGetS3MissingRegion(t *testing.T) {
-	installMockS3()
+	installMockS3(t)
 
 	_, err := getS3(map[string]interface{}{propBucket: propBucket},
 		map[string]interface{}{propAccessKey: testAccessLower, propSecretKey: testSecretLower})
 	assert.Error(t, err)
-	restoreS3()
 }
 
 func TestGetS3MissingAccessKey(t *testing.T) {
-	installMockS3()
+	installMockS3(t)
 
 	_, err := getS3(map[string]interface{}{propBucket: propBucket},
 		map[string]interface{}{propRegion: propRegion, propSecretKey: testSecretLower})
 	assert.Error(t, err)
-	restoreS3()
 }
 
 func TestGetS3MissingSecretKey(t *testing.T) {
-	installMockS3()
+	installMockS3(t)
 
 	_, err := getS3(map[string]interface{}{propBucket: propBucket},
 		map[string]interface{}{propRegion: propRegion, propAccessKey: testAccessLower})
 	assert.Error(t, err)
-	restoreS3()
 }
 
 func TestGetS3BadToken(t *testing.T) {
-	installMockS3()
+	installMockS3(t)
 
 	_, err := getS3(map[string]interface{}{propBucket: propBucket},
 		map[string]interface{}{propAccessKey: testAccessLower, propSecretKey: testSecretLower, propRegion: propRegion, propSessionToken: 4})
 	assert.Error(t, err)
-	restoreS3()
 }
 
 func TestGetS3BadRemote(t *testing.T) {
-	installMockS3()
+	installMockS3(t)
 
 	_, err := getS3(map[string]interface{}{propBucket: propBucket, propAccessKey: 4},
 		map[string]interface{}{propSecretKey: testSecretLower, propRegion: propRegion})
 	assert.Error(t, err)
-	restoreS3()
 }
 
 func TestNewConfigFails(t *testing.T) {
@@ -608,9 +614,7 @@ func TestNewConfigFails(t *testing.T) {
 		return aws.Config{}, errors.New("config error")
 	}
 
-	defer func() {
-		newConfig = originalNewConfig
-	}()
+	t.Cleanup(func() { newConfig = originalNewConfig })
 
 	_, err := getS3(map[string]interface{}{propAccessKey: testAccessLower, propSecretKey: testSecretLower, propRegion: propRegion},
 		map[string]interface{}{})
@@ -618,19 +622,18 @@ func TestNewConfigFails(t *testing.T) {
 }
 
 func TestInstallMock(t *testing.T) {
-	mockS3 = &MockS3{}
+	m := &MockS3{}
+	setMockS3(t, m)
 	svc, _ := getS3(map[string]interface{}{}, map[string]interface{}{})
-	assert.Equal(t, mockS3, svc)
-
-	mockS3 = nil
+	assert.Equal(t, ClientInterface(m), svc)
 }
 
 func TestGetMetadataContent(t *testing.T) {
-	mockS3 = &MockS3{
+	setMockS3(t, &MockS3{
 		GetObjectOutput: s3.GetObjectOutput{
 			Body: io.NopCloser(strings.NewReader("metadata")),
 		},
-	}
+	})
 
 	res, err := getMetadataContent(map[string]interface{}{propBucket: propBucket, propPath: propPath}, map[string]interface{}{})
 
@@ -640,22 +643,19 @@ func TestGetMetadataContent(t *testing.T) {
 			assert.Equal(t, "metadata", string(content))
 		}
 	}
-
-	mockS3 = nil
 }
 
 func TestGetMetadataGetS3Error(t *testing.T) {
-	installMockS3()
+	installMockS3(t)
 
 	_, err := getMetadataContent(map[string]interface{}{propBucket: propBucket, propPath: propPath}, map[string]interface{}{})
 	assert.Error(t, err)
-	restoreS3()
 }
 
 func TestGetMetadataMissing(t *testing.T) {
-	mockS3 = &MockS3{
+	setMockS3(t, &MockS3{
 		err: &types.NoSuchKey{},
-	}
+	})
 	res, err := getMetadataContent(map[string]interface{}{propBucket: propBucket, propPath: propPath}, map[string]interface{}{})
 
 	if assert.NoError(t, err) {
@@ -664,18 +664,14 @@ func TestGetMetadataMissing(t *testing.T) {
 			assert.Equal(t, "", string(content))
 		}
 	}
-
-	mockS3 = nil
 }
 
 func TestGetMetadataOtherError(t *testing.T) {
-	mockS3 = &MockS3{
+	setMockS3(t, &MockS3{
 		err: &types.NoSuchBucket{},
-	}
+	})
 	_, err := getMetadataContent(map[string]interface{}{propBucket: propBucket, propPath: propPath}, map[string]interface{}{})
 	assert.Error(t, err)
-
-	mockS3 = nil
 }
 
 func TestListCommits(t *testing.T) {
@@ -683,11 +679,11 @@ func TestListCommits(t *testing.T) {
 {"id": "one", "properties": {"timestamp": "2019-09-20T13:45:36Z"}}
 {"id": "two", "properties": {"timestamp": "2019-09-20T13:45:37Z"}}`
 
-	mockS3 = &MockS3{
+	setMockS3(t, &MockS3{
 		GetObjectOutput: s3.GetObjectOutput{
 			Body: io.NopCloser(strings.NewReader(metadata)),
 		},
-	}
+	})
 
 	r, _ := remote.Get("s3")
 	commits, err := r.ListCommits(map[string]interface{}{propBucket: propBucket, propPath: propPath}, map[string]interface{}{}, []remote.Tag{})
@@ -697,8 +693,6 @@ func TestListCommits(t *testing.T) {
 		assert.Equal(t, "two", commits[0].ID)
 		assert.Equal(t, "one", commits[1].ID)
 	}
-
-	mockS3 = nil
 }
 
 func TestListCommitsInvalid(t *testing.T) {
@@ -706,11 +700,11 @@ func TestListCommitsInvalid(t *testing.T) {
 foo
 {"id": "two", "properties": {"timestamp": "2019-09-20T13:45:37Z"}}`
 
-	mockS3 = &MockS3{
+	setMockS3(t, &MockS3{
 		GetObjectOutput: s3.GetObjectOutput{
 			Body: io.NopCloser(strings.NewReader(metadata)),
 		},
-	}
+	})
 
 	r, _ := remote.Get("s3")
 	commits, err := r.ListCommits(map[string]interface{}{propBucket: propBucket, propPath: propPath}, map[string]interface{}{}, []remote.Tag{})
@@ -719,8 +713,6 @@ foo
 		assert.Len(t, commits, 1)
 		assert.Equal(t, "two", commits[0].ID)
 	}
-
-	mockS3 = nil
 }
 
 func TestListCommitsTags(t *testing.T) {
@@ -728,11 +720,11 @@ func TestListCommitsTags(t *testing.T) {
 {"id": "one", "properties": {"timestamp": "2019-09-20T13:45:36Z", "tags": { "a": "b" }}}
 {"id": "two", "properties": {"timestamp": "2019-09-20T13:45:37Z", "tags": { "c": "d" }}}`
 
-	mockS3 = &MockS3{
+	setMockS3(t, &MockS3{
 		GetObjectOutput: s3.GetObjectOutput{
 			Body: io.NopCloser(strings.NewReader(metadata)),
 		},
-	}
+	})
 
 	r, _ := remote.Get("s3")
 	commits, err := r.ListCommits(map[string]interface{}{propBucket: propBucket, propPath: propPath}, map[string]interface{}{}, []remote.Tag{{Key: "a"}})
@@ -741,35 +733,102 @@ func TestListCommitsTags(t *testing.T) {
 		assert.Len(t, commits, 1)
 		assert.Equal(t, "one", commits[0].ID)
 	}
-
-	mockS3 = nil
 }
 
 func TestListCommitsError(t *testing.T) {
-	mockS3 = &MockS3{
+	setMockS3(t, &MockS3{
 		err: errors.New("error"),
-	}
+	})
 
 	r, _ := remote.Get("s3")
 	_, err := r.ListCommits(map[string]interface{}{propBucket: propBucket, propPath: propPath}, map[string]interface{}{}, []remote.Tag{{Key: "a"}})
 	assert.Error(t, err)
+}
 
-	mockS3 = nil
+// trackingReadCloser wraps a Reader and records whether Close was called.
+type trackingReadCloser struct {
+	io.Reader
+	closed bool
+}
+
+func (t *trackingReadCloser) Close() error {
+	t.closed = true
+	return nil
+}
+
+// errReader returns a non-EOF error after delivering some bytes, so that
+// bufio.Scanner.Err() surfaces a non-nil error after the scan loop.
+type errReader struct {
+	data []byte
+	pos  int
+	err  error
+}
+
+func (r *errReader) Read(p []byte) (int, error) {
+	if r.pos >= len(r.data) {
+		return 0, r.err
+	}
+
+	n := copy(p, r.data[r.pos:])
+	r.pos += n
+
+	return n, nil
+}
+
+func TestListCommitsClosesMetadataBody(t *testing.T) {
+	body := &trackingReadCloser{Reader: strings.NewReader(
+		`{"id": "one", "properties": {"timestamp": "2019-09-20T13:45:36Z"}}`,
+	)}
+	setMockS3(t, &MockS3{
+		GetObjectOutput: s3.GetObjectOutput{
+			Body: body,
+		},
+	})
+
+	r, _ := remote.Get("s3")
+	_, err := r.ListCommits(
+		map[string]interface{}{propBucket: propBucket, propPath: propPath},
+		map[string]interface{}{}, []remote.Tag{},
+	)
+
+	if assert.NoError(t, err) {
+		assert.True(t, body.closed, "metadata body must be closed after ListCommits")
+	}
+}
+
+func TestListCommitsScannerError(t *testing.T) {
+	// Reader returns a non-EOF error mid-read so scanner.Err() surfaces it.
+	body := io.NopCloser(&errReader{
+		data: []byte(`{"id": "one", "properties": {"timestamp": "2019-09-20T13:45:36Z"}}` + "\n"),
+		err:  errors.New("simulated read failure"),
+	})
+	setMockS3(t, &MockS3{
+		GetObjectOutput: s3.GetObjectOutput{
+			Body: body,
+		},
+	})
+
+	r, _ := remote.Get("s3")
+	_, err := r.ListCommits(
+		map[string]interface{}{propBucket: propBucket, propPath: propPath},
+		map[string]interface{}{}, []remote.Tag{},
+	)
+	assert.Error(t, err, "scanner.Err() should be surfaced after the scan loop")
+	assert.Contains(t, err.Error(), "simulated read failure")
 }
 
 func TestGetCommitBadS3(t *testing.T) {
-	installMockS3()
+	installMockS3(t)
 
 	r, _ := remote.Get("s3")
 	_, err := r.GetCommit(map[string]interface{}{}, map[string]interface{}{}, "id")
 	assert.Error(t, err)
-	restoreS3()
 }
 
 func TestGetCommitMissing(t *testing.T) {
-	mockS3 = &MockS3{
+	setMockS3(t, &MockS3{
 		err: &types.NoSuchKey{},
-	}
+	})
 
 	r, _ := remote.Get("s3")
 	commit, err := r.GetCommit(map[string]interface{}{propBucket: propBucket, propPath: propPath}, map[string]interface{}{}, "id")
@@ -777,28 +836,24 @@ func TestGetCommitMissing(t *testing.T) {
 	if assert.NoError(t, err) {
 		assert.Nil(t, commit)
 	}
-
-	mockS3 = nil
 }
 
 func TestGetCommitOtherError(t *testing.T) {
-	mockS3 = &MockS3{
+	setMockS3(t, &MockS3{
 		err: &types.NoSuchBucket{},
-	}
+	})
 
 	r, _ := remote.Get("s3")
 	_, err := r.GetCommit(map[string]interface{}{propBucket: propBucket, propPath: propPath}, map[string]interface{}{}, "id")
 	assert.Error(t, err)
-
-	mockS3 = nil
 }
 
 func TestGetCommitMissingMetadata(t *testing.T) {
-	mockS3 = &MockS3{
+	setMockS3(t, &MockS3{
 		GetObjectOutput: s3.GetObjectOutput{
 			Metadata: map[string]string{},
 		},
-	}
+	})
 
 	r, _ := remote.Get("s3")
 	commit, err := r.GetCommit(map[string]interface{}{propBucket: propBucket, propPath: propPath}, map[string]interface{}{}, "id")
@@ -806,16 +861,14 @@ func TestGetCommitMissingMetadata(t *testing.T) {
 	if assert.NoError(t, err) {
 		assert.Nil(t, commit)
 	}
-
-	mockS3 = nil
 }
 
 func TestGetCommitBadJson(t *testing.T) {
-	mockS3 = &MockS3{
+	setMockS3(t, &MockS3{
 		GetObjectOutput: s3.GetObjectOutput{
 			Metadata: map[string]string{"com.datadatdat": "notjson"},
 		},
-	}
+	})
 
 	r, _ := remote.Get("s3")
 	commit, err := r.GetCommit(map[string]interface{}{propBucket: propBucket, propPath: propPath}, map[string]interface{}{}, "id")
@@ -823,12 +876,10 @@ func TestGetCommitBadJson(t *testing.T) {
 	if assert.NoError(t, err) {
 		assert.Nil(t, commit)
 	}
-
-	mockS3 = nil
 }
 
 func TestGetCommit(t *testing.T) {
-	mockS3 = &MockS3{
+	setMockS3(t, &MockS3{
 		GetObjectOutput: s3.GetObjectOutput{
 			Metadata: map[string]string{
 				"com.datadatdat": `
@@ -836,7 +887,7 @@ func TestGetCommit(t *testing.T) {
 `,
 			},
 		},
-	}
+	})
 
 	r, _ := remote.Get("s3")
 	commit, err := r.GetCommit(map[string]interface{}{propBucket: propBucket, propPath: propPath}, map[string]interface{}{}, "id")
@@ -844,6 +895,4 @@ func TestGetCommit(t *testing.T) {
 	if assert.NoError(t, err) {
 		assert.Equal(t, "2019-09-20T13:45:37Z", commit.Properties["timestamp"])
 	}
-
-	mockS3 = nil
 }
