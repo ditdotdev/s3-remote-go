@@ -7,7 +7,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.32.19
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.18
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.102.1
-	github.com/datadatdat/remote-sdk-go v1.9.1
+	github.com/datadatdat/remote-sdk-go v1.9.2
 	github.com/stretchr/testify v1.11.1
 )
 
