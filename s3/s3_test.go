@@ -1,5 +1,5 @@
 /*
- * Copyright Datadatdat.
+ * Copyright Dit.
  */
 package s3
 
@@ -16,7 +16,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
-	"github.com/datadatdat/remote-sdk-go/remote"
+	"github.com/ditdotdev/remote-sdk-go/remote"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -359,12 +359,12 @@ func TestBadCredentialsRegion(t *testing.T) {
 
 func TestMetadataKey(t *testing.T) {
 	k := getMetadataKey(aws.String(testFoo))
-	assert.Equal(t, "foo/datadatdat", k)
+	assert.Equal(t, "foo/dit", k)
 }
 
 func TestMetadataKeyNil(t *testing.T) {
 	k := getMetadataKey(nil)
-	assert.Equal(t, "datadatdat", k)
+	assert.Equal(t, "dit", k)
 }
 
 func TestKeyNoPath(t *testing.T) {
@@ -866,7 +866,7 @@ func TestGetCommitMissingMetadata(t *testing.T) {
 func TestGetCommitBadJson(t *testing.T) {
 	setMockS3(t, &MockS3{
 		GetObjectOutput: s3.GetObjectOutput{
-			Metadata: map[string]string{"com.datadatdat": "notjson"},
+			Metadata: map[string]string{"com.dit": "notjson"},
 		},
 	})
 
@@ -882,7 +882,7 @@ func TestGetCommit(t *testing.T) {
 	setMockS3(t, &MockS3{
 		GetObjectOutput: s3.GetObjectOutput{
 			Metadata: map[string]string{
-				"com.datadatdat": `
+				"com.dit": `
 {"id": "two", "properties": {"timestamp": "2019-09-20T13:45:37Z", "tags": { "c": "d" }}}
 `,
 			},
