@@ -1,12 +1,12 @@
 # Project Development
 
 For general information about contributing changes, see the
-[Contributor Guidelines](https://github.com/datadatdat/.github/blob/master/CONTRIBUTING.md).
+[Contributor Guidelines](https://github.com/ditdotdev/.github/blob/master/CONTRIBUTING.md).
 
 ## How it Works
 
-The provider uses the Datadatdat `remote-sdk-go` to provide interfaces for
-Datadatdat to use.
+The provider uses the Dit `remote-sdk-go` to provide interfaces for
+Dit to use.
 
 ## Building
 

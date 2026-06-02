@@ -24,26 +24,26 @@ jobs:
           go-version: '1.26.2'
       - name: Configure Go for private modules
         run: |
-          go env -w GOPRIVATE=github.com/datadatdat/*
-          go env -w GONOPROXY=github.com/datadatdat/*
-          go env -w GONOSUMDB=github.com/datadatdat/*
+          go env -w GOPRIVATE=github.com/ditdotdev/*
+          go env -w GONOPROXY=github.com/ditdotdev/*
+          go env -w GONOSUMDB=github.com/ditdotdev/*
           go env -w GOPROXY=https://proxy.golang.org,direct
         shell: bash
         env:
-          GOPRIVATE: github.com/datadatdat/*
-          GONOPROXY: github.com/datadatdat/*
-          GONOSUMDB: github.com/datadatdat/*
+          GOPRIVATE: github.com/ditdotdev/*
+          GONOPROXY: github.com/ditdotdev/*
+          GONOSUMDB: github.com/ditdotdev/*
       - name: Build
         run: go build -v ./...
         env:
-          GOPRIVATE: github.com/datadatdat/*
-          GONOPROXY: github.com/datadatdat/*
-          GONOSUMDB: github.com/datadatdat/*
+          GOPRIVATE: github.com/ditdotdev/*
+          GONOPROXY: github.com/ditdotdev/*
+          GONOSUMDB: github.com/ditdotdev/*
           GIT_TERMINAL_PROMPT: 0
       - name: Test
         run: go test -v ./...
         env:
-          GOPRIVATE: github.com/datadatdat/*
-          GONOPROXY: github.com/datadatdat/*
-          GONOSUMDB: github.com/datadatdat/*
+          GOPRIVATE: github.com/ditdotdev/*
+          GONOPROXY: github.com/ditdotdev/*
+          GONOSUMDB: github.com/ditdotdev/*
           GIT_TERMINAL_PROMPT: 0

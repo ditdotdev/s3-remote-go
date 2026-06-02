@@ -1,4 +1,4 @@
-module github.com/datadatdat/s3-remote-go
+module github.com/ditdotdev/s3-remote-go
 
 go 1.26.2
 
@@ -7,7 +7,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.32.20
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.19
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.102.2
-	github.com/datadatdat/remote-sdk-go v1.9.2
+	github.com/ditdotdev/remote-sdk-go v1.9.3
 	github.com/stretchr/testify v1.11.1
 )
 

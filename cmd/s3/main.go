@@ -1,8 +1,8 @@
-// Package main provides the S3 remote server for Datadatdat data storage.
-// Package main provides the S3 remote server for Datadatdat data storage.
+// Package main provides the S3 remote server for Dit data storage.
+// Package main provides the S3 remote server for Dit data storage.
 package main
 
-import "github.com/datadatdat/remote-sdk-go/remote"
+import "github.com/ditdotdev/remote-sdk-go/remote"
 
 func main() {
 	remote.Serve("s3")
