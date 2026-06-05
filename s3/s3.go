@@ -61,7 +61,15 @@ import (
 type s3Remote struct{}
 
 const (
-	metadataProperty = "com.dit"
+	// metadataProperty is the canonical S3 user-metadata key under which per-commit
+	// metadata is written. It matches the Kotlin Maven group / reverse-DNS "dev.dit".
+	metadataProperty = "dev.dit"
+
+	// metadataPropertyLegacyDit and metadataPropertyLegacyDatadatdat are the legacy
+	// S3 user-metadata keys used before (respectively) the dit rename and the dit
+	// rename's predecessor. They are read as fallbacks so existing remotes keep working.
+	metadataPropertyLegacyDit        = "com.dit"
+	metadataPropertyLegacyDatadatdat = "com.datadatdat"
 
 	s3Scheme = "s3"
 
@@ -72,6 +80,17 @@ const (
 	propRegion       = "region"
 	propSessionToken = "sessionToken"
 )
+
+// metadataPropertyKeys lists the S3 user-metadata keys to try, in order, when reading
+// per-commit metadata. The canonical key (metadataProperty == "dev.dit") is tried first,
+// followed by legacy keys written before the dit rename ("com.dit") and before that
+// ("com.datadatdat"). This lets the provider read S3 remotes pushed by older providers
+// without forcing a re-push.
+var metadataPropertyKeys = []string{
+	metadataProperty,
+	metadataPropertyLegacyDit,
+	metadataPropertyLegacyDatadatdat,
+}
 
 // Type returns the type identifier for this remote.
 func (s s3Remote) Type() (string, error) {
@@ -447,8 +466,9 @@ func (s s3Remote) ListCommits(properties map[string]interface{}, parameters map[
 }
 
 // GetCommit gets the metadata for a single commit. This is stored as a user property on the object
-// with the key "com.dit". For historical reasons, we keep the metadata within the "properties"
-// sub-object. This matches how it's stored in the top-level metadata file.
+// under the canonical key "dev.dit", with fallback to the legacy keys "com.dit" and "com.datadatdat"
+// for remotes pushed before the dit rename. For historical reasons, we keep the metadata within the
+// "properties" sub-object. This matches how it's stored in the top-level metadata file.
 func (s s3Remote) GetCommit(properties map[string]interface{}, parameters map[string]interface{}, commitID string) (*remote.Commit, error) {
 	svc, err := getS3(properties, parameters)
 	if err != nil {
@@ -477,9 +497,17 @@ func (s s3Remote) GetCommit(properties map[string]interface{}, parameters map[st
 		return nil, err
 	}
 
-	metadata, ok := res.Metadata[metadataProperty]
+	var metadata string
 
-	if !ok || metadata == "" {
+	for _, k := range metadataPropertyKeys {
+		if v, ok := res.Metadata[k]; ok && v != "" {
+			metadata = v
+
+			break
+		}
+	}
+
+	if metadata == "" {
 		return nil, nil
 	}
 
