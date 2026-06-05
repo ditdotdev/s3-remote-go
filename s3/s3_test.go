@@ -866,7 +866,7 @@ func TestGetCommitMissingMetadata(t *testing.T) {
 func TestGetCommitBadJson(t *testing.T) {
 	setMockS3(t, &MockS3{
 		GetObjectOutput: s3.GetObjectOutput{
-			Metadata: map[string]string{"com.dit": "notjson"},
+			Metadata: map[string]string{metadataPropertyLegacyDit: "notjson"},
 		},
 	})
 
@@ -882,7 +882,7 @@ func TestGetCommit(t *testing.T) {
 	setMockS3(t, &MockS3{
 		GetObjectOutput: s3.GetObjectOutput{
 			Metadata: map[string]string{
-				"com.dit": `
+				metadataProperty: `
 {"id": "two", "properties": {"timestamp": "2019-09-20T13:45:37Z", "tags": { "c": "d" }}}
 `,
 			},
@@ -894,5 +894,52 @@ func TestGetCommit(t *testing.T) {
 
 	if assert.NoError(t, err) {
 		assert.Equal(t, "2019-09-20T13:45:37Z", commit.Properties["timestamp"])
+	}
+}
+
+// TestGetCommitLegacyKeyFallback verifies that GetCommit reads per-commit metadata
+// stored under legacy keys ("com.dit" pre-rename, "com.datadatdat" pre-dit) in
+// addition to the canonical "dev.dit" key, so existing S3 remotes keep working.
+func TestGetCommitLegacyKeyFallback(t *testing.T) {
+	for _, key := range []string{metadataProperty, metadataPropertyLegacyDit, metadataPropertyLegacyDatadatdat} {
+		t.Run(key, func(t *testing.T) {
+			setMockS3(t, &MockS3{
+				GetObjectOutput: s3.GetObjectOutput{
+					Metadata: map[string]string{
+						key: `
+{"id": "two", "properties": {"timestamp": "2019-09-20T13:45:37Z", "tags": { "c": "d" }}}
+`,
+					},
+				},
+			})
+
+			r, _ := remote.Get("s3")
+			commit, err := r.GetCommit(map[string]interface{}{propBucket: propBucket, propPath: propPath}, map[string]interface{}{}, "id")
+
+			if assert.NoError(t, err) && assert.NotNil(t, commit) {
+				assert.Equal(t, "2019-09-20T13:45:37Z", commit.Properties["timestamp"])
+			}
+		})
+	}
+}
+
+// TestGetCommitPrefersCanonicalKey verifies that when multiple keys are present, the
+// canonical "dev.dit" key wins over the legacy keys.
+func TestGetCommitPrefersCanonicalKey(t *testing.T) {
+	setMockS3(t, &MockS3{
+		GetObjectOutput: s3.GetObjectOutput{
+			Metadata: map[string]string{
+				metadataProperty:                 `{"id": "two", "properties": {"timestamp": "canonical"}}`,
+				metadataPropertyLegacyDit:        `{"id": "two", "properties": {"timestamp": "legacy-dit"}}`,
+				metadataPropertyLegacyDatadatdat: `{"id": "two", "properties": {"timestamp": "legacy-ddd"}}`,
+			},
+		},
+	})
+
+	r, _ := remote.Get("s3")
+	commit, err := r.GetCommit(map[string]interface{}{propBucket: propBucket, propPath: propPath}, map[string]interface{}{}, "id")
+
+	if assert.NoError(t, err) && assert.NotNil(t, commit) {
+		assert.Equal(t, "canonical", commit.Properties["timestamp"])
 	}
 }
