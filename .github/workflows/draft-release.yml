@@ -13,8 +13,6 @@ on:
   push:
     branches:
       - master
-    tags:
-      - 'v*'
 
 jobs:
   update_draft_release:
