@@ -1,6 +1,5 @@
-/*
- * Copyright Dit.
- */
+// Copyright Dit 2026
+// SPDX-License-Identifier: BUSL-1.1
 
 // Package s3 provides AWS S3 remote backend functionality for Dit data storage.
 package s3
