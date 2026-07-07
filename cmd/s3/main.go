@@ -1,3 +1,6 @@
+// Copyright Dit 2026
+// SPDX-License-Identifier: BUSL-1.1
+
 // Package main provides the S3 remote server for Dit data storage.
 // Package main provides the S3 remote server for Dit data storage.
 package main
