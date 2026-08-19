@@ -1,6 +1,6 @@
 module github.com/ditdotdev/s3-remote-go
 
-go 1.26.2
+go 1.26.6
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.43.5
